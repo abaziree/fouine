@@ -21,6 +21,8 @@ open Expressions
 %token FUN ARROW
 %token REF ASSIGN DEREF
 %token SEMI
+%token RAISE
+%token <string> EXCEPTION
 
 /* PARTIE 3 : Associativités et priorités */
 %nonassoc IN ELSE ARROW
@@ -78,7 +80,7 @@ expression:
   | e1=expression AND e2=expression         { BlOp(And, e1, e2) } 
   | e1=expression OR e2=expression          { BlOp(Or, e1, e2) } 
   | NOT e=expression                        { Not e } 
-  
+
   /* Structures let..in et let rec .. et fun */
   | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } 
   | LET x=binding EQ e1=expression IN e2=expression                         { LetIn(x, e1, e2) } 
@@ -96,6 +98,9 @@ application:
   | REF e=simple_expr               { Ref e }
   | DEREF e=simple_expr             { Deref e }
 
+  /*les exceptions*/
+ | RAISE e=EXCEPTION                { Raise(e) }
+  
 /* Niveau 1 : Expressions simples (priorité maximale) */
 simple_expr:
   | i=INT                           { Cst i } 

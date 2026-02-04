@@ -48,6 +48,7 @@ let rec affiche_expr e =
   | Ref e -> aff_aux "Ref(" [e]
   | Assign(e1, e2) -> aff_aux "Assign(" [e1; e2]
   | Deref e -> aff_aux "Deref(" [e]
+  | Raise s -> print_string("Raise(" ^ s ^ ")")
 
 let affiche_val v = match v with 
   | VI k -> print_int k
@@ -55,3 +56,4 @@ let affiche_val v = match v with
   | VClosure _ -> print_string "<fun>"
   | VUnit -> print_string "()"
   | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">");
+  | VError s -> print_string ("Error " ^ s) 

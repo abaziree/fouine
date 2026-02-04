@@ -10,6 +10,7 @@ let minuscule = ['a'-'z']
 let majuscule = ['A'-'Z']
 let lettre = minuscule | majuscule
 let ident = minuscule (lettre | chiffre | '_')*
+let except = majuscule + (lettre | '_')*
 
 rule token = parse    
   | [' ' '\t' '\n']     { token lexbuf }    (* On saute les blancs et les tabulations *)
@@ -50,4 +51,6 @@ rule token = parse
   | ":="                { ASSIGN }
   | '!'                 { DEREF }
   | ';'                 { SEMI }
+  | "raise"             { RAISE }
   | ident as id         { IDENT id }
+  | except as ex        { EXCEPTION ex }

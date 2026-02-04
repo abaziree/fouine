@@ -1,0 +1,1 @@
+let f x = if x = 0 then raise Not_found else 4 in f 0
