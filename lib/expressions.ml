@@ -203,7 +203,7 @@ let rec eval expr env = match expr with
     | Fun(x, e) ->
         let rec new_env = (f, VClosure(x, e, new_env)) :: env in
         eval e2 new_env
-    | _ -> raise (ErreurDeType "Let rec requiert une fonction"))
+    | _ -> eval (LetIn(f, e1, e2)) env)
 
   | Unit -> VUnit
 

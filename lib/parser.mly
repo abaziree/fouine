@@ -47,7 +47,8 @@ main:
 top_expression:
   | e=expression                                                                  { e }
   (*| LET x=binding EQ e=expression SEMISEMI                                        { LetIn(x, e, Unit) }*)
-  | LET x=binding EQ e1=expression SEMISEMI e2=top_expression                     { LetIn(x, e1, e2) } 
+  | LET x=binding EQ e1=expression SEMISEMI e2=top_expression                     { LetIn(x, e1, e2) }
+  | LET REC x=binding EQ e1=expression SEMISEMI e2=top_expression                 { LetRec(x, e1, e2) }   
   | LET f=IDENT params=binding+ EQ e1=expression SEMISEMI e2=top_expression       { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(f, fun_expr, e2) }
   | LET REC f=IDENT params=binding+ EQ e1=expression SEMISEMI e2=top_expression   { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
 
@@ -81,7 +82,8 @@ expression:
   
   /* Structures let..in et let rec .. et fun */
   | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } 
-  | LET x=binding EQ e1=expression IN e2=expression                         { LetIn(x, e1, e2) } 
+  | LET x=binding EQ e1=expression IN e2=expression                         { LetIn(x, e1, e2) }
+  | LET REC x=binding EQ e1=expression IN e2=expression                     { LetRec(x, e1, e2) }  
   | LET f=IDENT params=binding+ EQ e1=expression IN e2=expression           { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(f, fun_expr, e2) } 
   | LET REC f=IDENT params=binding+ EQ e1=expression IN e2=expression       { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
   | FUN params=binding+ ARROW e=expression                                  { List.fold_right (fun param body -> Fun(param, body)) params e } 
