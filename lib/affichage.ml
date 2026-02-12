@@ -17,6 +17,13 @@ let string_of_blop blop = match blop with
   | And -> "And"
   | Or -> "Or"
 
+(* Affichage d'un motif *)
+let rec affiche_motif m = match m with
+  | MVar x   -> print_string x
+  | MWild    -> print_string "_"
+  | MUnit    -> print_string "()"
+  | MTuple ms -> print_string "(" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string ")"
+
 (* Fonction d'affichage *)
 let rec affiche_expr e =
   let aff_aux s l = 
@@ -40,18 +47,24 @@ let rec affiche_expr e =
   | Not e -> aff_aux "Not(" [e]
   | PrInt e -> aff_aux "PrInt(" [e]
   | Ident x -> print_string ("Ident(" ^ x ^ ")")
-  | LetIn(x, e1, e2) -> aff_aux ("LetIn(" ^ x ^ ", ") [e1; e2]
-  | Fun(x, e) -> aff_aux ("Fun(" ^ x ^ ", ") [e]
+  | LetIn(m, e1, e2) -> print_string "LetIn(" ; affiche_motif m ; print_string ", " ; affiche_expr e1 ; print_string ", " ; affiche_expr e2 ; print_string ")"
+  | Fun(m, e) -> print_string "Fun(" ; affiche_motif m ; print_string ", " ; affiche_expr e ; print_string ")"
   | App(e1, e2) -> aff_aux "App(" [e1; e2]
   | LetRec(f, e1, e2) -> aff_aux ("LetRec(" ^ f ^ ", ") [e1; e2]
   | Unit -> print_string "()"
   | Ref e -> aff_aux "Ref(" [e]
   | Assign(e1, e2) -> aff_aux "Assign(" [e1; e2]
   | Deref e -> aff_aux "Deref(" [e]
+  | Tuple es -> print_string "(" ; List.iteri (fun i e -> affiche_expr e ; if i < List.length es - 1 then print_string ", ") es ; print_string ")"
+  | MatchWith(e, branches) -> 
+    print_string "MatchWith(" ; affiche_expr e ; print_string ", [" ;
+    List.iteri (fun i (m, ei) -> affiche_motif m ; print_string "->" ; affiche_expr ei ; if i < List.length branches - 1 then print_string " | ") branches ;
+    print_string "])"
 
-let affiche_val v = match v with 
+let rec affiche_val v = match v with 
   | VI k -> print_int k
   | VB b -> if b then print_string "true" else print_string "false"
   | VClosure _ -> print_string "<fun>"
   | VUnit -> print_string "()"
-  | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">");
+  | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">")
+  | VTuple vs -> print_string "(" ; List.iteri (fun i v -> affiche_val v ; if i < List.length vs - 1 then print_string ", ") vs ; print_string ")"

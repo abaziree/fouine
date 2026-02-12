@@ -50,4 +50,8 @@ rule token = parse
   | ":="                { ASSIGN }
   | '!'                 { DEREF }
   | ';'                 { SEMI }
+  | "match"             { MATCH }
+  | "with"              { WITH }
+  | '|'                 { PIPE }
+  | ','                 { COMMA }
   | ident as id         { IDENT id }

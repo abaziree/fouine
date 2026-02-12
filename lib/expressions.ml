@@ -16,6 +16,13 @@ type blop =
   | And 
   | Or
 
+(* Type pour les motifs *)
+type motif =
+  | MVar of string          
+  | MWild                  
+  | MUnit                
+  | MTuple of motif list 
+
 (* Type pour les expressions *)
 type expr =
   | Cst of int
@@ -26,23 +33,26 @@ type expr =
   | Not of expr
   | PrInt of expr
   | Ident of string
-  | LetIn of string * expr * expr
-  | Fun of string * expr
+  | LetIn of motif * expr * expr
+  | Fun of motif * expr
   | App of expr * expr
   | LetRec of string * expr * expr
   | Unit
   | Ref of expr 
   | Assign of expr * expr
   | Deref of expr
+  | Tuple of expr list
+  | MatchWith of expr * (motif * expr) list
   
 
 (* Type pour les valeurs *)
 type valeur = 
   | VI of int
   | VB of bool
-  | VClosure of string * expr * environnement
+  | VClosure of motif * expr * environnement
   | VUnit
   | VAddr of int
+  | VTuple of valeur list
 
 (* Type pour l'environnement (association variable -> valeur) *)
 and environnement = (string * valeur) list
@@ -61,14 +71,16 @@ exception ConditionNonBooleenne
 exception ApplicationNonFonction
 exception TasPlein 
 exception AdresseInvalide of int
+exception FiltrageSansCorrespondance
 
 (* Fonction pour afficher une valeur *)
-let affiche_valeur v = match v with 
+let rec affiche_valeur v = match v with 
   | VI k -> print_int k ; print_newline ()
   | VB b -> print_string (if b then "true" else "false") ; print_newline ()
   | VClosure _ -> print_string "<fun>" ; print_newline ()
   | VUnit -> print_string "()" ; print_newline () 
   | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; print_newline () 
+  | VTuple vs -> print_string "(" ; List.iteri (fun i v -> affiche_valeur v ; if i < List.length vs - 1 then print_string ", ") vs ; print_string ")" ; print_newline ()
 
 (* Recherche d'une variable dans l'environnement *)
 let rec cherche_var x env = match env with
@@ -98,6 +110,22 @@ let ecrire_tas addr valeur =
     raise (AdresseInvalide addr)
   else
     tas.(addr) <- valeur
+
+(* Tente de faire correspondre un motif à une valeur *)
+let rec filtre motif valeur = match motif, valeur with
+  | MWild, _ -> Some []
+  | MUnit, VUnit -> Some []
+  | MVar x, v -> Some [(x, v)]
+  | MTuple ms, VTuple vs when List.length ms = List.length vs ->
+    List.fold_left2 (fun acc m v -> 
+      match acc with
+      | None -> None
+      | Some bindings ->
+        (match filtre m v with
+        | None -> None
+        | Some new_bindings -> Some (bindings @ new_bindings)))
+      (Some []) ms vs
+  | _ -> None
 
 (* Évaluation d'une expression dans un environnement *)
 let rec eval expr env = match expr with 
@@ -181,29 +209,31 @@ let rec eval expr env = match expr with
   
   | Ident x -> cherche_var x env
   
-  | LetIn(x, e1, e2) -> 
+  | LetIn(m, e1, e2) -> 
     let v1 = eval e1 env in
-    let new_env = (x, v1) :: env in
-    eval e2 new_env
+    (match filtre m v1 with
+    | Some bindings -> eval e2 (bindings @ env)
+    | None -> raise FiltrageSansCorrespondance)
   
-  | Fun(x, e) ->
-    VClosure(x, e, env)
+  | Fun(m, e) ->
+    VClosure(m, e, env)
   
   | App(e1, e2) ->
     let v_arg = eval e2 env in
     let v_fun = eval e1 env in
     (match v_fun with
-    | VClosure(x, e, env_closure) ->
-        let new_env = (x, v_arg) :: env_closure in
-        eval e new_env
+    | VClosure(m, e, env_closure) ->
+      (match filtre m v_arg with
+      | Some bindings -> eval e (bindings @ env_closure)
+      | None -> raise FiltrageSansCorrespondance)
     | _ -> raise ApplicationNonFonction)
   
   | LetRec(f, e1, e2) ->
     (match e1 with
-    | Fun(x, e) ->
-        let rec new_env = (f, VClosure(x, e, new_env)) :: env in
+    | Fun(m, e) ->
+        let rec new_env = (f, VClosure(m, e, new_env)) :: env in
         eval e2 new_env
-    | _ -> eval (LetIn(f, e1, e2)) env)
+    | _ -> eval (LetIn(MVar f, e1, e2)) env)
 
   | Unit -> VUnit
 
@@ -223,6 +253,21 @@ let rec eval expr env = match expr with
     (match v with
     | VAddr addr -> lire_tas addr
     | _ -> raise (ErreurDeType "Le déréférencement requiert une référence"))
+
+  | Tuple es ->
+    let vs = List.map (fun e -> eval e env) es in
+    VTuple vs
+
+  | MatchWith(e, branches) ->
+    let v = eval e env in
+    let rec essaie_branches brch = match brch with
+    | [] -> raise FiltrageSansCorrespondance
+    | (m, e)::reste ->
+      (match filtre m v with
+      | Some bindings -> eval e (bindings @ env)
+      | None -> essaie_branches reste)
+    in 
+    essaie_branches branches
 
 (* Version simplifiée de eval pour fouine.ml - sans environnement en paramètre *)
 let eval e = 
