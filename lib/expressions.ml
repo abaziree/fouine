@@ -18,6 +18,8 @@ type blop =
 
 (* Type pour les motifs *)
 type motif =
+  | MCst of int
+  | MBool of bool
   | MVar of string          
   | MWild                  
   | MUnit                
@@ -42,7 +44,7 @@ type expr =
   | Assign of expr * expr
   | Deref of expr
   | Tuple of expr list
-  | MatchWith of expr * (motif * expr) list
+  | MatchWith of expr * (motif list * expr) list
   
 
 (* Type pour les valeurs *)
@@ -113,19 +115,22 @@ let ecrire_tas addr valeur =
 
 (* Tente de faire correspondre un motif à une valeur *)
 let rec filtre motif valeur = match motif, valeur with
+  | MCst i, VI j when i=j -> Some [] 
   | MWild, _ -> Some []
   | MUnit, VUnit -> Some []
   | MVar x, v -> Some [(x, v)]
   | MTuple ms, VTuple vs when List.length ms = List.length vs ->
-    List.fold_left2 (fun acc m v -> 
-      match acc with
-      | None -> None
-      | Some bindings ->
-        (match filtre m v with
-        | None -> None
-        | Some new_bindings -> Some (bindings @ new_bindings)))
-      (Some []) ms vs
+    let resultats = List.map2 filtre ms vs in
+    if List.mem None resultats then None
+    else Some (List.concat (List.map (function Some l -> l | _ -> []) resultats))
   | _ -> None
+
+let rec chercher_match motifs valeur = match motifs with
+  | [] -> None
+  | m::ms ->
+    (match filtre m valeur with
+    | None -> chercher_match ms valeur
+    | Some env -> Some env)
 
 (* Évaluation d'une expression dans un environnement *)
 let rec eval expr env = match expr with 
@@ -262,10 +267,10 @@ let rec eval expr env = match expr with
     let v = eval e env in
     let rec essaie_branches brch = match brch with
     | [] -> raise FiltrageSansCorrespondance
-    | (m, e)::reste ->
-      (match filtre m v with
-      | Some bindings -> eval e (bindings @ env)
-      | None -> essaie_branches reste)
+    | (motifs, e)::reste ->
+      (match chercher_match motifs v with
+      | None -> essaie_branches reste
+      | Some new_env -> eval e (new_env @ env))
     in 
     essaie_branches branches
 

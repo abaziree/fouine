@@ -24,11 +24,14 @@ open Expressions
 %token COMMA 
 %token MATCH WITH PIPE
 
+/* Token de priorités */
+%token PRIO_PIPE
+
 /* PARTIE 3 : Associativités et priorités */
-%nonassoc IN ELSE
+%nonassoc IN ELSE PRIO_PIPE
+%right PIPE
 %right ARROW
 %right SEMI
-%left COMMA
 %nonassoc ASSIGN
 %left OR
 %left AND
@@ -61,7 +64,7 @@ expression:
   | e=application { e } 
 
   /* Tuple primitif pour éviter Tuple(e1::e2::e3) et non Tuple(e1::Tuple(e2::e3)) */
-  | e=expression COMMA es=expression_tuple  { Tuple(e::es) } 
+  | e=application COMMA es=expression_tuple { Tuple(e::es) } 
   
   /* Opérations arithmétiques */
   | e1=expression PLUS e2=expression        { ArOp(Add, e1, e2) } 
@@ -111,8 +114,8 @@ simple_expr:
   | b=BOOL                            { Bool b } 
   | id=IDENT                          { Ident id } 
   | LPAREN RPAREN                     { Unit }
-  | LPAREN e=expression RPAREN    { e } 
-  | BEGIN e=expression END        { e } 
+  | LPAREN e=expression RPAREN        { e } 
+  | BEGIN e=expression END            { e } 
 
 /* On les gardes pour let rec f = ... */
 binding:
@@ -120,26 +123,29 @@ binding:
   | UNDERSCORE      { "_" }
 
 /* Motifs */
+motif_pipe:
+  | m=motif                                 { [m] }
+  | m=motif PIPE ms=motif_pipe              { m::ms }
+
 motif:
   | m=motif_simple                          { m }
-  | m1=motif COMMA m2=motif_suite           { MTuple(m1::m2) }
+  | m=motif_simple COMMA ms=motif_suite     { MTuple(m::ms) }
 
 motif_suite:
   | m=motif_simple                          { [m] }
   | m=motif_simple COMMA ms=motif_suite     { m::ms }
 
 motif_simple:
+  | i=INT                                   { MCst i }
+  | b=BOOL                                  { MBool b }
   | id=IDENT                                { MVar id }
   | UNDERSCORE                              { MWild }
   | LPAREN RPAREN                           { MUnit }
   | LPAREN m=motif RPAREN                   { m }
 
-/* Branches des mathc .. with */
+/* Branches des match .. with */
 branches:
-  | b=branche                                             { [b] }
-  | b=branche rest=branches                               { b::rest }
-
-branche:
-  | PIPE m=motif ARROW e=expression                       { (m, e) }
+  | PIPE m=motif_pipe ARROW e=expression    %prec PRIO_PIPE    { [(m, e)] }
+  | PIPE m=motif_pipe ARROW e=expression rest=branches         { (m, e)::rest }
 
 %%

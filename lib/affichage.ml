@@ -19,9 +19,11 @@ let string_of_blop blop = match blop with
 
 (* Affichage d'un motif *)
 let rec affiche_motif m = match m with
-  | MVar x   -> print_string x
-  | MWild    -> print_string "_"
-  | MUnit    -> print_string "()"
+  | MCst k -> print_int k
+  | MBool b -> if b then print_string "true" else print_string "false"
+  | MVar x -> print_string x
+  | MWild -> print_string "_"
+  | MUnit -> print_string "()"
   | MTuple ms -> print_string "(" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string ")"
 
 (* Fonction d'affichage *)
@@ -58,7 +60,7 @@ let rec affiche_expr e =
   | Tuple es -> print_string "(" ; List.iteri (fun i e -> affiche_expr e ; if i < List.length es - 1 then print_string ", ") es ; print_string ")"
   | MatchWith(e, branches) -> 
     print_string "MatchWith(" ; affiche_expr e ; print_string ", [" ;
-    List.iteri (fun i (m, ei) -> affiche_motif m ; print_string "->" ; affiche_expr ei ; if i < List.length branches - 1 then print_string " | ") branches ;
+    List.iteri (fun i (motifs, ei) -> List.iteri (fun j m -> affiche_motif m ; if j < List.length motifs - 1 then print_string " | ") motifs ; print_string "->" ; affiche_expr ei ; if i < List.length branches - 1 then print_string " | ") branches ;
     print_string "])"
 
 let rec affiche_val v = match v with 
