@@ -34,7 +34,8 @@ type expr =
   | Ref of expr 
   | Assign of expr * expr
   | Deref of expr
-  | Raise of string
+  | Raise of int
+  | Try_with of expr*expr*string
   
 
 (* Type pour les valeurs *)
@@ -44,7 +45,7 @@ type valeur =
   | VClosure of string * expr * environnement
   | VUnit
   | VAddr of int
-  | VError of string
+  | VError of int
 
 (* Type pour l'environnement (association variable -> valeur) *)
 and environnement = (string * valeur) list
@@ -71,7 +72,7 @@ let affiche_valeur v = match v with
   | VClosure _ -> print_string "<fun>" ; print_newline ()
   | VUnit -> print_string "()" ; print_newline () 
   | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; print_newline () 
-  | VError s -> print_string ("Erreur : " ^ s); print_newline()
+  | VError s -> print_string ("Erreur : "); print_int s; print_newline()
 
 (* Recherche d'une variable dans l'environnement *)
 let rec cherche_var x env = match env with
@@ -227,6 +228,10 @@ let rec eval expr env = match expr with
     | VAddr addr -> lire_tas addr
     | _ -> raise (ErreurDeType "Le déréférencement requiert une référence"))
   | Raise s -> VError(s)
+  |Try_with (e1, e2, k) -> let res = eval e1 env in begin match res with
+    | VError(u) -> eval e2 ((k, VI(u))::env)
+    | _ -> res
+  end 
 
 (* Version simplifiée de eval pour fouine.ml - sans environnement en paramètre *)
 let eval e = 

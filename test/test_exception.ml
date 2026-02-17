@@ -1,1 +1,1 @@
-let f x = if x = 0 then raise Not_found else 4 in f 2
+let f x = raise (E 0) in try f 0 with E k -> 4;;

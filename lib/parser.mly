@@ -21,8 +21,9 @@ open Expressions
 %token FUN ARROW
 %token REF ASSIGN DEREF
 %token SEMI
-%token RAISE
-%token <string> EXCEPTION
+%token RAISE 
+%token EXCEPTION
+%token TRY WITH
 
 /* PARTIE 3 : Associativités et priorités */
 %nonassoc IN ELSE ARROW
@@ -89,6 +90,7 @@ expression:
   | FUN params=binding+ ARROW e=expression                                  { List.fold_right (fun param body -> Fun(param, body)) params e } 
   | e1=expression SEMI e2=expression                                        { LetIn("_", e1, e2) }
   | e1=application ASSIGN e2=expression                                     { Assign(e1, e2) }
+  | TRY e1=expression WITH EXCEPTION k=IDENT ARROW e2=expression            { Try_with(e1, e2, k) }
 
 /* Niveau 2 : Application de fonction (associative à gauche) */
 application:
@@ -99,7 +101,8 @@ application:
   | DEREF e=simple_expr             { Deref e }
 
   /*les exceptions*/
- | RAISE e=EXCEPTION                { Raise(e) }
+ | RAISE LPAREN EXCEPTION  i=INT RPAREN       { Raise(i) }
+
   
 /* Niveau 1 : Expressions simples (priorité maximale) */
 simple_expr:
@@ -110,4 +113,3 @@ simple_expr:
   | LPAREN e=expression RPAREN      { e } 
   | BEGIN e=expression END          { e } 
 
-%%
