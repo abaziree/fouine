@@ -64,10 +64,6 @@ binding:
   | LPAREN RPAREN   { "()" }
 
 
-//expression_semi:
-//  | e=expression  { e }
-//  | e1=expression_semi SEMI e2=expression_semi { LetIn("_", e1, e2)}
-
 /* Niveau 3 : Expressions générales (priorité basse) */
 expression:
   | e=application { e } 
@@ -125,8 +121,6 @@ application:
 liste:
   | a=expression SEMI e=liste       { Cons(a, e)}
   | a=expression RCROCHET           { Cons(a, Nil)}
- // | LPAREN a=expression_semi RPAREN SEMI e=liste {Cons(a, e)}
- // | LPAREN a=expression_semi RPAREN RCROCHET {Cons(a, Nil)} 
   
 /* Niveau 1 : Expressions simples (priorité maximale) */
 simple_expr:
