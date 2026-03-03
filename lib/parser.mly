@@ -24,10 +24,13 @@ open Expressions
 %token RAISE 
 %token EXCEPTION
 %token TRY WITH
+%token NIL CONS LCROCHET RCROCHET
+
 
 /* PARTIE 3 : Associativités et priorités */
+%left CONS
 %nonassoc IN ELSE ARROW
-%right SEMI
+%right SEMI RCROCHET
 %nonassoc ASSIGN
 %left OR
 %left AND
@@ -43,13 +46,14 @@ open Expressions
 /* PARTIE 5 : Grammaire */
 %%
 
+
 main:
   | e=top_expression EOF { e } 
 
 /* Gestion du niveau racine avec ;; */
-top_expression:
-  | e=expression                                                                  { e }
-  (*| LET x=binding EQ e=expression SEMISEMI                                        { LetIn(x, e, Unit) }*)
+top_expression:       
+  | e=expression                                                    { e }
+  (*| LET x=binding EQ e=expression SEMISEMI                                     { LetIn(x, e, Unit) }*)
   | LET x=binding EQ e1=expression SEMISEMI e2=top_expression                     { LetIn(x, e1, e2) } 
   | LET f=IDENT params=binding+ EQ e1=expression SEMISEMI e2=top_expression       { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(f, fun_expr, e2) }
   | LET REC f=IDENT params=binding+ EQ e1=expression SEMISEMI e2=top_expression   { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
@@ -58,6 +62,11 @@ binding:
   | id=IDENT        { id } 
   | UNDERSCORE      { "_" }
   | LPAREN RPAREN   { "()" }
+
+
+//expression_semi:
+//  | e=expression  { e }
+//  | e1=expression_semi SEMI e2=expression_semi { LetIn("_", e1, e2)}
 
 /* Niveau 3 : Expressions générales (priorité basse) */
 expression:
@@ -82,15 +91,23 @@ expression:
   | e1=expression OR e2=expression          { BlOp(Or, e1, e2) } 
   | NOT e=expression                        { Not e } 
 
+  /*Opérations sur les listes*/
+
+  | NIL                                  { Nil }
+  | a=expression CONS e=expression       { Cons(a, e)}
+  | LCROCHET a=expression SEMI e=liste   { Cons(a, e)}
+  | LCROCHET a=expression RCROCHET       { Cons (a, Nil)}
+
   /* Structures let..in et let rec .. et fun */
   | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } 
   | LET x=binding EQ e1=expression IN e2=expression                         { LetIn(x, e1, e2) } 
   | LET f=IDENT params=binding+ EQ e1=expression IN e2=expression           { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(f, fun_expr, e2) } 
   | LET REC f=IDENT params=binding+ EQ e1=expression IN e2=expression       { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
   | FUN params=binding+ ARROW e=expression                                  { List.fold_right (fun param body -> Fun(param, body)) params e } 
-  | e1=expression SEMI e2=expression                                        { LetIn("_", e1, e2) }
   | e1=application ASSIGN e2=expression                                     { Assign(e1, e2) }
   | TRY e1=expression WITH EXCEPTION k=IDENT ARROW e2=expression            { Try_with(e1, e2, k) }
+  | e1=expression SEMI e2=expression { LetIn("_", e1, e2)}
+
 
 /* Niveau 2 : Application de fonction (associative à gauche) */
 application:
@@ -103,6 +120,13 @@ application:
   /*les exceptions*/
  | RAISE LPAREN EXCEPTION  i=INT RPAREN       { Raise(i) }
 
+
+  /*les listes*/
+liste:
+  | a=expression SEMI e=liste       { Cons(a, e)}
+  | a=expression RCROCHET           { Cons(a, Nil)}
+ // | LPAREN a=expression_semi RPAREN SEMI e=liste {Cons(a, e)}
+ // | LPAREN a=expression_semi RPAREN RCROCHET {Cons(a, Nil)} 
   
 /* Niveau 1 : Expressions simples (priorité maximale) */
 simple_expr:
@@ -112,4 +136,3 @@ simple_expr:
   | LPAREN RPAREN                   { Unit }
   | LPAREN e=expression RPAREN      { e } 
   | BEGIN e=expression END          { e } 
-

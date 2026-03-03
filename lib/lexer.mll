@@ -34,6 +34,10 @@ rule token = parse
   | '<'                 { LESS }
   | '>'                 { GREATER }
   | "&&"                { AND }
+  | '['                 { LCROCHET }
+  | ']'                 { RCROCHET }
+  | "[]"                { NIL }
+  | "::"                { CONS }
   | "||"                { OR }
   | "not"               { NOT }
   | "begin"             { BEGIN }

@@ -49,7 +49,26 @@ let rec affiche_expr e =
   | Assign(e1, e2) -> aff_aux "Assign(" [e1; e2]
   | Deref e -> aff_aux "Deref(" [e]
   | Raise s -> print_string("Raise("); print_int s; print_string (")")
-  |Try_with (e1, e2, k)-> print_string "TryWith("; affiche_expr e1; print_string (", "^ k ^ ", ");  affiche_expr e2; print_string ")"
+  | Try_with (e1, e2, k)-> print_string "TryWith("; affiche_expr e1; print_string (", "^ k ^ ", ");  affiche_expr e2; print_string ")"
+  | Cons(a, l) -> aff_aux "Cons(" [a;l]
+  | Nil -> print_string "Nil"
+
+let rec aux_affiche_liste (l:expr list) = match l with
+  | [t] ->affiche_expr t; print_string "]"
+  | t::q -> affiche_expr t; print_string "; "; aux_affiche_liste q
+  | [] -> print_string "[]" (*pour simplifier l'affichage des listes*)
+
+ let rec aux_affiche(l : valeur list) : unit = match l with
+  | [] -> print_string("]")
+  | t :: q -> begin match t with 
+    | VI k -> print_int k ; if q <> [] then print_string(";"); aux_affiche q
+    | VB b -> print_string (if b then "true" else "false") ; if q <> [] then print_string(";"); aux_affiche q
+    | VClosure _ -> print_string "<fun>" ; if q <> [] then print_string(";"); aux_affiche q
+    | VUnit -> print_string "()" ; if q <> [] then print_string(";"); aux_affiche q
+    | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; if q <> [] then print_string(";"); aux_affiche q 
+    | VError s -> print_string ("Erreur : "); print_int s; if q <> [] then print_string(";"); aux_affiche q
+    | Vlist l -> print_string("["); aux_affiche(l)
+end
 
 let affiche_val v = match v with 
   | VI k -> print_int k
@@ -58,3 +77,4 @@ let affiche_val v = match v with
   | VUnit -> print_string "()"
   | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">");
   | VError s -> print_string ("Error "); print_int s 
+  | Vlist l -> if l = [] then print_string "[]" else (print_string "["; aux_affiche l)

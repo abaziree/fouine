@@ -16,6 +16,8 @@ type blop =
   | And 
   | Or
 
+
+
 (* Type pour les expressions *)
 type expr =
   | Cst of int
@@ -36,6 +38,8 @@ type expr =
   | Deref of expr
   | Raise of int
   | Try_with of expr*expr*string
+  | Cons of expr*expr
+  | Nil
   
 
 (* Type pour les valeurs *)
@@ -46,6 +50,7 @@ type valeur =
   | VUnit
   | VAddr of int
   | VError of int
+  | Vlist of valeur list
 
 (* Type pour l'environnement (association variable -> valeur) *)
 and environnement = (string * valeur) list
@@ -66,14 +71,26 @@ exception TasPlein
 exception AdresseInvalide of int
 
 (* Fonction pour afficher une valeur *)
-let affiche_valeur v = match v with 
+ let rec aux_affiche(l : valeur list) : unit = match l with
+  | [] -> print_string("]")
+  | t :: q -> begin match t with 
+    | VI k -> print_int k ; if q <> [] then print_string(";"); aux_affiche q
+    | VB b -> print_string (if b then "true" else "false") ; if q <> [] then print_string(";"); aux_affiche q
+    | VClosure _ -> print_string "<fun>" ; if q <> [] then print_string(";"); aux_affiche q
+    | VUnit -> print_string "()" ; if q <> [] then print_string(";"); aux_affiche q
+    | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; if q <> [] then print_string(";"); aux_affiche q 
+    | VError s -> print_string ("Erreur : "); print_int s; if q <> [] then print_string(";"); aux_affiche q
+    | Vlist l -> print_string("["); aux_affiche(l)
+end
+
+let  affiche_valeur v =  match v with 
   | VI k -> print_int k ; print_newline ()
   | VB b -> print_string (if b then "true" else "false") ; print_newline ()
   | VClosure _ -> print_string "<fun>" ; print_newline ()
   | VUnit -> print_string "()" ; print_newline () 
   | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; print_newline () 
   | VError s -> print_string ("Erreur : "); print_int s; print_newline()
-
+  | Vlist l -> if l = [] then (print_string("[]")) else print_string("["); aux_affiche(l)
 (* Recherche d'une variable dans l'environnement *)
 let rec cherche_var x env = match env with
   | [] -> raise (VariableNonDefinie x)
@@ -231,8 +248,12 @@ let rec eval expr env = match expr with
   |Try_with (e1, e2, k) -> let res = eval e1 env in begin match res with
     | VError(u) -> eval e2 ((k, VI(u))::env)
     | _ -> res
-  end 
-
+  end
+  | Nil -> Vlist([])
+  | Cons(e, l) -> begin match eval l env with
+    | Vlist(ll) -> Vlist((eval e env)::ll)
+    | _-> raise (ErreurDeType"pas les bons types pour les listes")
+  end
 (* Version simplifiée de eval pour fouine.ml - sans environnement en paramètre *)
 let eval e = 
   let env = [] in

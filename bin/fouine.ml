@@ -1,14 +1,24 @@
 open Lib
 
+let _DEBUG = ref false
+
+let _SHOWSRC = ref false
+
 (* "incantations" qu'il n'est pas nécessaire de comprendre dans un premier
    temps : on récupère l'entrée, dans un fichier ou sur le clavier *)
 let nom_fichier = ref ""
 
 let recupere_entree () =
+  let opt_list = [
+    ("-showsrc", Arg.Set _SHOWSRC, "Affiche le programme Fouine fourni sans l'exécuter");
+     "-debug", Arg.Set _DEBUG, "utilise -showsrc et évalue le programme"
+  ] in 
+  let usage = "pour fouiner. Utilisation : ./fouine <fichier> [options]" in
+
   Arg.parse (* ci-dessous les 3 arguments de Arg.parse : *)
-    [] (* la liste des options, vide *)
+    opt_list(* la liste des options, vide *)
     (fun s -> nom_fichier := s) (* la fonction a déclencher lorsqu'on récupère un string qui n'est pas une option : ici c'est le nom du fichier, et on stocke cette information dans la référence nom_fichier *)
-    ""; (* le message d'accueil, qui est vide *)
+    usage; (* le message d'accueil, qui est vide *)
   try
     let where_from = match !nom_fichier with
       | "" -> stdin
