@@ -18,7 +18,7 @@ type blop =
 
 (* Type pour les motifs *)
 type motif =
-  | MCst of int
+  | MInt of int
   | MBool of bool
   | MVar of string          
   | MWild                  
@@ -115,7 +115,8 @@ let ecrire_tas addr valeur =
 
 (* Tente de faire correspondre un motif à une valeur *)
 let rec filtre motif valeur = match motif, valeur with
-  | MCst i, VI j when i=j -> Some [] 
+  | MInt i, VI j when i=j -> Some [] 
+  | MBool b1, VB b2 when b1=b2 -> Some []
   | MWild, _ -> Some []
   | MUnit, VUnit -> Some []
   | MVar x, v -> Some [(x, v)]

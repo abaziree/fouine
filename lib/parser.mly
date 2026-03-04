@@ -26,10 +26,13 @@ open Expressions
 
 /* Token de priorités */
 %token PRIO_PIPE
+%token PRIO_TUPLE
+%token BOTTOM
 
 /* PARTIE 3 : Associativités et priorités */
 %nonassoc IN ELSE PRIO_PIPE
 %right PIPE
+%nonassoc PRIO_TUPLE
 %right ARROW
 %right SEMI
 %nonassoc ASSIGN
@@ -39,6 +42,7 @@ open Expressions
 %left EQ NEQ LESS GREATER LESS_EQ GREATER_EQ
 %left PLUS MINUS
 %left TIMES DIVIDE MODULO
+%nonassoc BOTTOM
 
 /* PARTIE 4 : Point d'entrée */
 %start main
@@ -59,31 +63,9 @@ top_expression:
   | LET f=IDENT params=motif+ EQ e1=expression SEMISEMI e2=top_expression         { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) }
   | LET REC f=IDENT params=motif+ EQ e1=expression SEMISEMI e2=top_expression     { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
 
-/* Niveau 3 : Expressions générales (priorité basse) */
+/* Niveau 5 : Expressions générales (priorité basse) avec les tuples inclus */
 expression:
-  | e=application { e } 
-
-  /* Tuple primitif pour éviter Tuple(e1::e2::e3) et non Tuple(e1::Tuple(e2::e3)) */
-  | e=application COMMA es=expression_tuple { Tuple(e::es) } 
-  
-  /* Opérations arithmétiques */
-  | e1=expression PLUS e2=expression        { ArOp(Add, e1, e2) } 
-  | e1=expression TIMES e2=expression       { ArOp(Mul, e1, e2) }
-  | e1=expression MINUS e2=expression       { ArOp(Min, e1, e2) } 
-  | e1=expression DIVIDE e2=expression      { ArOp(Div, e1, e2) } 
-  | e1=expression MODULO e2=expression      { ArOp(Mod, e1, e2) } 
-  | MINUS e=expression                      { ArOp(Min, Cst 0, e) } 
-  
-  /* Opérations booléennes */
-  | e1=expression EQ e2=expression          { BlOp(Eq, e1, e2) }
-  | e1=expression NEQ e2=expression         { BlOp(NEq, e1, e2) } 
-  | e1=expression LESS_EQ e2=expression     { BlOp(LessEq, e1, e2) } 
-  | e1=expression GREATER_EQ e2=expression  { BlOp(GreaterEq, e1, e2) } 
-  | e1=expression LESS e2=expression        { BlOp(Less, e1, e2) } 
-  | e1=expression GREATER e2=expression     { BlOp(Greater, e1, e2) } 
-  | e1=expression AND e2=expression         { BlOp(And, e1, e2) } 
-  | e1=expression OR e2=expression          { BlOp(Or, e1, e2) } 
-  | NOT e=expression                        { Not e } 
+  | e=expression_tuple { e }
   
   /* Structures let..in , let rec .. et fun , := et match .. with*/
   | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } 
@@ -96,11 +78,67 @@ expression:
   | e1=application ASSIGN e2=expression                                     { Assign(e1, e2) }
   | MATCH e=expression WITH branches=branches                               { MatchWith(e, branches) }
 
-/* Niveau 2 : Application de fonction (associative à gauche) */
-expression_tuple:
-  | e=application                                           { [e] }
-  | e=application COMMA es=expression_tuple                 { e::es }
+/* Niveau 4b : Expressions générales (priorité basse) mais sans tuples */
+expression_no_tuple:
+  | e=expression_op { e } %prec BOTTOM
+  
+  /* Structures let..in , let rec .. et fun , := et match .. with */
+  | IF e1=expression THEN e2=expression_no_tuple ELSE e3=expression_no_tuple          { IfThenElse(e1, e2, e3) } 
+  | LET m=motif EQ e1=expression IN e2=expression_no_tuple                            { LetIn(m, e1, e2) }
+  | LET REC x=binding EQ e1=expression IN e2=expression_no_tuple                      { LetRec(x, e1, e2) }  
+  | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple              { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
+  | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple          { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
+  | FUN params=motif+ ARROW e=expression_no_tuple                                     { List.fold_right (fun param body -> Fun(param, body)) params e } 
+  | e1=expression_no_tuple SEMI e2=expression_no_tuple                                { LetIn(MWild, e1, e2) }
+  | e1=application ASSIGN e2=expression_no_tuple                                      { Assign(e1, e2) }
+  | MATCH e=expression WITH branches=branches_no_tuple                                { MatchWith(e, branches) }
 
+/* Niveau 4a : Tuples */
+expression_tuple:
+  | e=expression_op                                     { e }
+  | e=expression_op COMMA es=expression_tuple_rest      { Tuple(e::es) }
+
+expression_tuple_rest:
+  | e=expression_tuple_last                             { [e] }
+  | e=expression_op COMMA es=expression_tuple_rest      { e::es }
+
+expression_tuple_last:
+  | e=expression_op { e }
+  
+  /* Structures let..in , let rec .. et fun , := et match .. with*/
+  | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } %prec PRIO_TUPLE
+  | LET m=motif EQ e1=expression IN e2=expression                           { LetIn(m, e1, e2) } %prec PRIO_TUPLE
+  | LET REC x=binding EQ e1=expression IN e2=expression                     { LetRec(x, e1, e2) } %prec PRIO_TUPLE
+  | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression             { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } %prec PRIO_TUPLE
+  | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression         { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) } %prec PRIO_TUPLE
+  | FUN params=motif+ ARROW e=expression                                    { List.fold_right (fun param body -> Fun(param, body)) params e } %prec PRIO_TUPLE
+  | MATCH e=expression WITH branches=branches                               { MatchWith(e, branches) } 
+
+/* Niveau 3 : Expression d'opérateurs */
+expression_op:
+  | e=application { e }
+
+  /* Opérations arithmétiques */
+  | e1=expression_op PLUS e2=expression_no_tuple        { ArOp(Add, e1, e2) }
+  | e1=expression_op TIMES e2=expression_no_tuple       { ArOp(Mul, e1, e2) }
+  | e1=expression_op MINUS e2=expression_no_tuple       { ArOp(Min, e1, e2) }
+  | e1=expression_op DIVIDE e2=expression_no_tuple      { ArOp(Div, e1, e2) }
+  | e1=expression_op MODULO e2=expression_no_tuple      { ArOp(Mod, e1, e2) }
+  | MINUS e=expression_no_tuple                         { ArOp(Min, Cst 0, e) }
+  
+  /* Opérations booléennes */
+  | e1=expression_op EQ e2=expression_no_tuple          { BlOp(Eq, e1, e2) }
+  | e1=expression_op NEQ e2=expression_no_tuple         { BlOp(NEq, e1, e2) } 
+  | e1=expression_op LESS_EQ e2=expression_no_tuple     { BlOp(LessEq, e1, e2) } 
+  | e1=expression_op GREATER_EQ e2=expression_no_tuple  { BlOp(GreaterEq, e1, e2) } 
+  | e1=expression_op LESS e2=expression_no_tuple        { BlOp(Less, e1, e2) } 
+  | e1=expression_op GREATER e2=expression_no_tuple     { BlOp(Greater, e1, e2) } 
+  | e1=expression_op AND e2=expression_no_tuple         { BlOp(And, e1, e2) } 
+  | e1=expression_op OR e2=expression_no_tuple          { BlOp(Or, e1, e2) } 
+  | NOT e=expression_op                                 { Not e } 
+
+
+/* Niveau 2 : Application de fonction (associative à gauche) */
 application:
   | e=simple_expr                   { e } 
   | e1=application e2=simple_expr   { App(e1, e2) } 
@@ -136,7 +174,7 @@ motif_suite:
   | m=motif_simple COMMA ms=motif_suite     { m::ms }
 
 motif_simple:
-  | i=INT                                   { MCst i }
+  | i=INT                                   { MInt i }
   | b=BOOL                                  { MBool b }
   | id=IDENT                                { MVar id }
   | UNDERSCORE                              { MWild }
@@ -147,5 +185,11 @@ motif_simple:
 branches:
   | PIPE m=motif_pipe ARROW e=expression    %prec PRIO_PIPE    { [(m, e)] }
   | PIPE m=motif_pipe ARROW e=expression rest=branches         { (m, e)::rest }
+
+branches_no_tuple:
+  | PIPE m=motif_pipe ARROW e=expression_no_tuple    %prec PRIO_PIPE        { [(m, e)] }
+  | PIPE m=motif_pipe ARROW e=expression_no_tuple rest=branches_no_tuple    { (m, e)::rest }
+
+
 
 %%

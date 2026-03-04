@@ -19,7 +19,7 @@ let string_of_blop blop = match blop with
 
 (* Affichage d'un motif *)
 let rec affiche_motif m = match m with
-  | MCst k -> print_int k
+  | MInt k -> print_int k
   | MBool b -> if b then print_string "true" else print_string "false"
   | MVar x -> print_string x
   | MWild -> print_string "_"
