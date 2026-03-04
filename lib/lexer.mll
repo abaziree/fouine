@@ -59,8 +59,6 @@ rule token = parse
   | '|'                 { PIPE }
   | ','                 { COMMA }
   | "try"               { TRY }
-  | "with"              { WITH }
   | "raise"             { RAISE }
   | 'E'                 { EXCEPTION }
   | ident as id         { IDENT id }
-  (*| '|'                 { PIPE }*)
