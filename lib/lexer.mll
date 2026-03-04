@@ -34,6 +34,10 @@ rule token = parse
   | '<'                 { LESS }
   | '>'                 { GREATER }
   | "&&"                { AND }
+  | '['                 { LCROCHET }
+  | ']'                 { RCROCHET }
+  | "[]"                { NIL }
+  | "::"                { CONS }
   | "||"                { OR }
   | "not"               { NOT }
   | "begin"             { BEGIN }
@@ -54,4 +58,9 @@ rule token = parse
   | "with"              { WITH }
   | '|'                 { PIPE }
   | ','                 { COMMA }
+  | "try"               { TRY }
+  | "with"              { WITH }
+  | "raise"             { RAISE }
+  | 'E'                 { EXCEPTION }
   | ident as id         { IDENT id }
+  (*| '|'                 { PIPE }*)

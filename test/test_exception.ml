@@ -1,0 +1,1 @@
+let f x = raise (E 0) in try f 0 with E k -> 4;;
