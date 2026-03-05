@@ -18,31 +18,37 @@ open Expressions
 %token LET REC IN
 %token SEMISEMI
 %token UNDERSCORE
-%token FUN ARROW
+%token FUN FUNCTION ARROW
 %token REF ASSIGN DEREF
 %token SEMI
 %token COMMA 
 %token MATCH WITH PIPE
+%token RAISE 
+%token EXCEPTION
+%token TRY
+%token NIL CONS LCROCHET RCROCHET
+
 
 /* Token de priorités */
 %token PRIO_PIPE
 %token PRIO_TUPLE
-%token BOTTOM
+%token PRIO_NO_TUPLE_EXPR_OP
 
 /* PARTIE 3 : Associativités et priorités */
 %nonassoc IN ELSE PRIO_PIPE
 %right PIPE
 %nonassoc PRIO_TUPLE
 %right ARROW
-%right SEMI
+%left CONS
+%right SEMI RCROCHET
 %nonassoc ASSIGN
 %left OR
 %left AND
 %nonassoc NOT
 %left EQ NEQ LESS GREATER LESS_EQ GREATER_EQ
 %left PLUS MINUS
+%nonassoc PRIO_NO_TUPLE_EXPR_OP
 %left TIMES DIVIDE MODULO
-%nonassoc BOTTOM
 
 /* PARTIE 4 : Point d'entrée */
 %start main
@@ -73,14 +79,19 @@ expression:
   | LET REC x=binding EQ e1=expression IN e2=expression                     { LetRec(x, e1, e2) }  
   | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression             { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
   | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression         { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
-  | FUN params=motif+ ARROW e=expression                                    { List.fold_right (fun param body -> Fun(param, body)) params e } 
+  | FUN params=motif+ ARROW e=expression                                    { List.fold_right (fun param body -> Fun(param, body)) params e }
+  | FUNCTION branches=branches                                              { Function branches }
+  | FUNCTION PIPE branches=branches                                         { Function branches }
   | e1=expression SEMI e2=expression                                        { LetIn(MWild, e1, e2) }
   | e1=application ASSIGN e2=expression                                     { Assign(e1, e2) }
   | MATCH e=expression WITH branches=branches                               { MatchWith(e, branches) }
+  | MATCH e=expression WITH PIPE branches=branches                          { MatchWith(e, branches) }
+  | TRY e=expression WITH branches=branches                                 { TryWith(e, branches) }
+  | TRY e=expression WITH PIPE branches=branches                            { TryWith(e, branches) }
 
 /* Niveau 4b : Expressions générales (priorité basse) mais sans tuples */
 expression_no_tuple:
-  | e=expression_op { e } %prec BOTTOM
+  | e=expression_op { e } %prec PRIO_NO_TUPLE_EXPR_OP
   
   /* Structures let..in , let rec .. et fun , := et match .. with */
   | IF e1=expression THEN e2=expression_no_tuple ELSE e3=expression_no_tuple          { IfThenElse(e1, e2, e3) } 
@@ -89,9 +100,14 @@ expression_no_tuple:
   | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple              { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
   | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple          { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
   | FUN params=motif+ ARROW e=expression_no_tuple                                     { List.fold_right (fun param body -> Fun(param, body)) params e } 
+  | FUNCTION branches=branches_no_tuple                                               { Function branches }
+  | FUNCTION PIPE branches=branches_no_tuple                                          { Function branches }
   | e1=expression_no_tuple SEMI e2=expression_no_tuple                                { LetIn(MWild, e1, e2) }
   | e1=application ASSIGN e2=expression_no_tuple                                      { Assign(e1, e2) }
   | MATCH e=expression WITH branches=branches_no_tuple                                { MatchWith(e, branches) }
+  | MATCH e=expression WITH PIPE branches=branches_no_tuple                           { MatchWith(e, branches) }
+  | TRY e=expression WITH branches=branches_no_tuple                                  { TryWith(e, branches) }
+  | TRY e=expression WITH PIPE branches=branches_no_tuple                             { TryWith(e, branches) }
 
 /* Niveau 4a : Tuples */
 expression_tuple:
@@ -112,7 +128,12 @@ expression_tuple_last:
   | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression             { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } %prec PRIO_TUPLE
   | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression         { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) } %prec PRIO_TUPLE
   | FUN params=motif+ ARROW e=expression                                    { List.fold_right (fun param body -> Fun(param, body)) params e } %prec PRIO_TUPLE
+  | FUNCTION branches=branches                                              { Function branches }
+  | FUNCTION PIPE branches=branches                                         { Function branches }
   | MATCH e=expression WITH branches=branches                               { MatchWith(e, branches) } 
+  | MATCH e=expression WITH PIPE branches=branches                          { MatchWith(e, branches) } 
+  | TRY e=expression WITH branches=branches                                 { TryWith(e, branches) }
+  | TRY e=expression WITH PIPE branches=branches                            { TryWith(e, branches) }
 
 /* Niveau 3 : Expression d'opérateurs */
 expression_op:
@@ -137,23 +158,30 @@ expression_op:
   | e1=expression_op OR e2=expression_no_tuple          { BlOp(Or, e1, e2) } 
   | NOT e=expression_op                                 { Not e } 
 
+  /*Opérations sur les listes*/
+  | e1=expression_op CONS e2=expression_no_tuple        { Cons(e1, e2) }
 
 /* Niveau 2 : Application de fonction (associative à gauche) */
 application:
-  | e=simple_expr                   { e } 
-  | e1=application e2=simple_expr   { App(e1, e2) } 
-  | PRINT e=simple_expr             { PrInt e }
-  | REF e=simple_expr               { Ref e }
-  | DEREF e=simple_expr             { Deref e }
+  | e=simple_expr                             { e } 
+  | e1=application e2=simple_expr             { App(e1, e2) } 
+  | PRINT e=simple_expr                       { PrInt e }
+  | REF e=simple_expr                         { Ref e }
+  | EXCEPTION e=simple_expr                   { Exception e }
+  | RAISE e=simple_expr                       { Raise e }
 
 /* Niveau 1 : Expressions simples (priorité maximale) */
 simple_expr:
-  | i=INT                             { Cst i } 
-  | b=BOOL                            { Bool b } 
-  | id=IDENT                          { Ident id } 
-  | LPAREN RPAREN                     { Unit }
-  | LPAREN e=expression RPAREN        { e } 
-  | BEGIN e=expression END            { e } 
+  | i=INT                                       { Cst i } 
+  | b=BOOL                                      { Bool b } 
+  | id=IDENT                                    { Ident id } 
+  | LPAREN RPAREN                               { Unit }
+  | NIL                                         { Nil }
+  | LCROCHET e1=expression SEMI e2=liste        { Cons(e1, e2) }
+  | LCROCHET e=expression RCROCHET              { Cons(e, Nil) }
+  | DEREF e=simple_expr                         { Deref e }
+  | LPAREN e=expression RPAREN                  { e } 
+  | BEGIN e=expression END                      { e } 
 
 /* On les gardes pour let rec f = ... */
 binding:
@@ -167,11 +195,16 @@ motif_pipe:
 
 motif:
   | m=motif_simple                          { m }
-  | m=motif_simple COMMA ms=motif_suite     { MTuple(m::ms) }
+  | m=motif_simple COMMA ms=motif_tuple     { MTuple(m::ms) }
+  | m1=motif_simple CONS m2=motif           { MCons(m1, m2) }
 
-motif_suite:
+motif_tuple:
   | m=motif_simple                          { [m] }
-  | m=motif_simple COMMA ms=motif_suite     { m::ms }
+  | m=motif_simple COMMA ms=motif_tuple     { m::ms }
+
+motif_list:
+  | m=motif                                 { [m] }
+  | m=motif SEMI ms=motif_list              { m::ms }
 
 motif_simple:
   | i=INT                                   { MInt i }
@@ -179,17 +212,24 @@ motif_simple:
   | id=IDENT                                { MVar id }
   | UNDERSCORE                              { MWild }
   | LPAREN RPAREN                           { MUnit }
+  | NIL                                     { MNil }
+  | EXCEPTION m=motif_simple                { MException m }
+  | LCROCHET m=motif_list RCROCHET          { MList m }
   | LPAREN m=motif RPAREN                   { m }
 
-/* Branches des match .. with */
+/* Branches des match .. with et try .. with */
 branches:
-  | PIPE m=motif_pipe ARROW e=expression    %prec PRIO_PIPE    { [(m, e)] }
-  | PIPE m=motif_pipe ARROW e=expression rest=branches         { (m, e)::rest }
+  | m=motif_pipe ARROW e=expression    %prec PRIO_PIPE          { [(m, e)] }
+  | m=motif_pipe ARROW e=expression PIPE rest=branches          { (m, e)::rest }
 
 branches_no_tuple:
-  | PIPE m=motif_pipe ARROW e=expression_no_tuple    %prec PRIO_PIPE        { [(m, e)] }
-  | PIPE m=motif_pipe ARROW e=expression_no_tuple rest=branches_no_tuple    { (m, e)::rest }
+  | m=motif_pipe ARROW e=expression_no_tuple    %prec PRIO_PIPE             { [(m, e)] }
+  | m=motif_pipe ARROW e=expression_no_tuple PIPE rest=branches_no_tuple    { (m, e)::rest }
 
+/* Les listes */
+liste:
+  | a=expression RCROCHET           { Cons(a, Nil) }
+  | a=expression SEMI e=liste       { Cons(a, e) }
 
 
 %%

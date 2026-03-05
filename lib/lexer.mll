@@ -47,6 +47,7 @@ rule token = parse
   | "rec"               { REC }
   | "in"                { IN }
   | "fun"               { FUN }
+  | "function"          { FUNCTION }
   | "->"                { ARROW }
   | ";;"                { SEMISEMI }
   | '_'                 { UNDERSCORE }

@@ -25,6 +25,10 @@ let rec affiche_motif m = match m with
   | MWild -> print_string "_"
   | MUnit -> print_string "()"
   | MTuple ms -> print_string "(" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string ")"
+  | MException m -> print_string "E " ; affiche_motif m 
+  | MCons(m1, m2) -> affiche_motif m1 ; print_string "::" ; affiche_motif m2
+  | MNil -> print_string "[]"
+  | MList ms -> print_string "[" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string "]"
 
 (* Fonction d'affichage *)
 let rec affiche_expr e =
@@ -51,46 +55,38 @@ let rec affiche_expr e =
   | Ident x -> print_string ("Ident(" ^ x ^ ")")
   | LetIn(m, e1, e2) -> print_string "LetIn(" ; affiche_motif m ; print_string ", " ; affiche_expr e1 ; print_string ", " ; affiche_expr e2 ; print_string ")"
   | Fun(m, e) -> print_string "Fun(" ; affiche_motif m ; print_string ", " ; affiche_expr e ; print_string ")"
+  | Function branches -> 
+    print_string "Function(" ; print_string ", [" ;
+    List.iteri (fun i (motifs, ei) -> List.iteri (fun j m -> affiche_motif m ; if j < List.length motifs - 1 then print_string " | ") motifs ; print_string " -> " ; affiche_expr ei ; if i < List.length branches - 1 then print_string " | ") branches ;
+    print_string "])"
   | App(e1, e2) -> aff_aux "App(" [e1; e2]
   | LetRec(f, e1, e2) -> aff_aux ("LetRec(" ^ f ^ ", ") [e1; e2]
   | Unit -> print_string "()"
   | Ref e -> aff_aux "Ref(" [e]
   | Assign(e1, e2) -> aff_aux "Assign(" [e1; e2]
   | Deref e -> aff_aux "Deref(" [e]
-  | Tuple es -> print_string "(" ; List.iteri (fun i e -> affiche_expr e ; if i < List.length es - 1 then print_string ", ") es ; print_string ")"
+  | Tuple es -> print_string "Tuple(" ; List.iteri (fun i e -> affiche_expr e ; if i < List.length es - 1 then print_string ", ") es ; print_string ")"
   | MatchWith(e, branches) -> 
     print_string "MatchWith(" ; affiche_expr e ; print_string ", [" ;
+    List.iteri (fun i (motifs, ei) -> List.iteri (fun j m -> affiche_motif m ; if j < List.length motifs - 1 then print_string " | ") motifs ; print_string " -> " ; affiche_expr ei ; if i < List.length branches - 1 then print_string " | ") branches ;
+    print_string "])"
+  | Exception e -> print_string "Exception(" ; affiche_expr e ; print_string ")"
+  | Raise e -> print_string "Raise(" ; affiche_expr e ; print_string ")"
+  | TryWith (e, branches)-> 
+    print_string "TryWith(" ; affiche_expr e ; print_string ", [" ;
     List.iteri (fun i (motifs, ei) -> List.iteri (fun j m -> affiche_motif m ; if j < List.length motifs - 1 then print_string " | ") motifs ; print_string "->" ; affiche_expr ei ; if i < List.length branches - 1 then print_string " | ") branches ;
     print_string "])"
-  | Raise s -> print_string("Raise("); print_int s; print_string (")")
-  | Try_with (e1, e2, k)-> print_string "TryWith("; affiche_expr e1; print_string (", "^ k ^ ", ");  affiche_expr e2; print_string ")"
   | Cons(a, l) -> aff_aux "Cons(" [a;l]
   | Nil -> print_string "Nil"
 
-let rec aux_affiche_liste (l:expr list) = match l with
-  | [t] ->affiche_expr t; print_string "]"
-  | t::q -> affiche_expr t; print_string "; "; aux_affiche_liste q
-  | [] -> print_string "[]" (*pour simplifier l'affichage des listes*)
-
- let rec aux_affiche(l : valeur list) : unit = match l with
-  | [] -> print_string("]")
-  | t :: q -> begin match t with 
-    | VI k -> print_int k ; if q <> [] then print_string(";"); aux_affiche q
-    | VB b -> print_string (if b then "true" else "false") ; if q <> [] then print_string(";"); aux_affiche q
-    | VClosure _ -> print_string "<fun>" ; if q <> [] then print_string(";"); aux_affiche q
-    | VUnit -> print_string "()" ; if q <> [] then print_string(";"); aux_affiche q
-    | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; if q <> [] then print_string(";"); aux_affiche q 
-    | VError s -> print_string ("Erreur : "); print_int s; if q <> [] then print_string(";"); aux_affiche q
-    | Vlist l -> print_string("["); aux_affiche(l)
-    | _ -> print_int 123
-    end
-
-let rec affiche_val v = match v with 
+let rec affiche_val v =  match v with 
   | VI k -> print_int k
-  | VB b -> if b then print_string "true" else print_string "false"
+  | VB b -> print_string (if b then "true" else "false")
   | VClosure _ -> print_string "<fun>"
+  | VFunctionClosure _ -> print_string "<fun>"
   | VUnit -> print_string "()"
   | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">")
   | VTuple vs -> print_string "(" ; List.iteri (fun i v -> affiche_val v ; if i < List.length vs - 1 then print_string ", ") vs ; print_string ")"
-  | VError s -> print_string ("Error "); print_int s 
-  | Vlist l -> if l = [] then print_string "[]" else (print_string "["; aux_affiche l)
+  | VException k -> print_string "E " ; print_int k
+  | VError k -> print_string "Exception: " ; print_int k
+  | VList l -> print_string "[" ; List.iteri (fun i v -> affiche_val v ; if i < List.length l - 1 then print_string "; ") l ; print_string "]"

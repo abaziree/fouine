@@ -37,27 +37,29 @@ let recupere_entree () =
 (* le traitement d'une expression en entrée *)   
 let execute e =
   begin
-    Affichage.affiche_expr e; (* on affiche e *)
-    print_newline();
+    if (!_SHOWSRC || !_DEBUG) then (
+      Affichage.affiche_expr e; (* on affiche e *)
+      print_newline());
     try
       let v = Expressions.eval e in (* on évalue e *)
-      Affichage.affiche_val v;
-      print_newline();
+      if (!_DEBUG) then (
+        Affichage.affiche_val v;
+        print_newline());
     with
     | Expressions.DivisionParZero ->
-        Printf.eprintf "Erreur: Division par zéro\n";
+        Printf.eprintf "Error: Division by zero\n";
         exit 1
     | Expressions.VariableNonDefinie x ->
-        Printf.eprintf "Erreur: Variable '%s' non définie\n" x;
+        Printf.eprintf "Error: Undefined variable '%s'\n" x;
         exit 1
     | Expressions.ErreurDeType msg ->
-        Printf.eprintf "Erreur de type: %s\n" msg;
+        Printf.eprintf "Typing error: %s\n" msg;
         exit 1
     | Expressions.ConditionNonBooleenne ->
-        Printf.eprintf "Erreur: La condition d'un if doit être un booléen\n";
+        Printf.eprintf "Error: The condition of an 'if' must be a boolean\n";
         exit 1
     | Expressions.ApplicationNonFonction ->
-        Printf.eprintf "Erreur: Tentative d'application sur une valeur qui n'est pas une fonction\n";
+        Printf.eprintf "Error: Attempt to apply to a value that is not a function\n";
         exit 1
   end
 

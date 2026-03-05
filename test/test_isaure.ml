@@ -1,5 +1,1 @@
-let f x y = match x,y with
-| true, true -> 50
-| true, false -> 40
-| false, _ -> 30 ;;
-7, 8, match 1 with | 1 -> 30,1 | _ -> 5 , 90 ;
+[7,[8,9;4] ; let x=ref 5 in x:=8 ; !x ; 7]

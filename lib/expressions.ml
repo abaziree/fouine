@@ -24,6 +24,10 @@ type motif =
   | MWild                  
   | MUnit                
   | MTuple of motif list 
+  | MException of motif
+  | MCons of motif * motif
+  | MNil
+  | MList of  motif list
 
 (* Type pour les expressions *)
 type expr =
@@ -37,6 +41,7 @@ type expr =
   | Ident of string
   | LetIn of motif * expr * expr
   | Fun of motif * expr
+  | Function of (motif list * expr) list
   | App of expr * expr
   | LetRec of string * expr * expr
   | Unit
@@ -45,9 +50,10 @@ type expr =
   | Deref of expr
   | Tuple of expr list
   | MatchWith of expr * (motif list * expr) list
-  | Raise of int
-  | Try_with of expr*expr*string
-  | Cons of expr*expr
+  | Exception of expr
+  | Raise of expr
+  | TryWith of expr * (motif list * expr) list
+  | Cons of expr * expr
   | Nil
   
 
@@ -56,11 +62,13 @@ type valeur =
   | VI of int
   | VB of bool
   | VClosure of motif * expr * environnement
+  | VFunctionClosure of (motif list * expr) list * environnement
   | VUnit
   | VAddr of int
   | VTuple of valeur list
+  | VException of int
   | VError of int
-  | Vlist of valeur list
+  | VList of valeur list
 
 (* Type pour l'environnement (association variable -> valeur) *)
 and environnement = (string * valeur) list
@@ -82,28 +90,17 @@ exception AdresseInvalide of int
 exception FiltrageSansCorrespondance
 
 (* Fonction pour afficher une valeur *)
- let rec aux_affiche(l : valeur list) : unit = match l with
-  | [] -> print_string("]")
-  | t :: q -> begin match t with 
-    | VI k -> print_int k ; if q <> [] then print_string(";"); aux_affiche q
-    | VB b -> print_string (if b then "true" else "false") ; if q <> [] then print_string(";"); aux_affiche q
-    | VClosure _ -> print_string "<fun>" ; if q <> [] then print_string(";"); aux_affiche q
-    | VUnit -> print_string "()" ; if q <> [] then print_string(";"); aux_affiche q
-    | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; if q <> [] then print_string(";"); aux_affiche q 
-    | VError s -> print_string ("Erreur : "); print_int s; if q <> [] then print_string(";"); aux_affiche q
-    | Vlist l -> print_string("["); aux_affiche(l)
-    | _ -> print_int 123
-end
-
-let rec affiche_valeur v =  match v with 
-  | VI k -> print_int k ; print_newline ()
-  | VB b -> print_string (if b then "true" else "false") ; print_newline ()
-  | VClosure _ -> print_string "<fun>" ; print_newline ()
-  | VUnit -> print_string "()" ; print_newline () 
-  | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">") ; print_newline () 
-  | VTuple vs -> print_string "(" ; List.iteri (fun i v -> affiche_valeur v ; if i < List.length vs - 1 then print_string ", ") vs ; print_string ")" ; print_newline ()
-  | VError s -> print_string ("Erreur : "); print_int s; print_newline()
-  | Vlist l -> if l = [] then (print_string("[]")) else print_string("["); aux_affiche(l)
+let rec affiche_valeur v = match v with 
+  | VI k -> print_int k
+  | VB b -> print_string (if b then "true" else "false")
+  | VClosure _ -> print_string "<fun>"
+  | VFunctionClosure _ -> print_string "<fun>"
+  | VUnit -> print_string "()"
+  | VAddr a -> print_string ("<ref:" ^ string_of_int a ^ ">")
+  | VTuple vs -> print_string "(" ; List.iteri (fun i v -> affiche_valeur v ; if i < List.length vs - 1 then print_string ", ") vs ; print_string ")"
+  | VException k -> print_string "E " ; print_int k
+  | VError k -> print_string "Exception: " ; print_int k
+  | VList l -> print_string "[" ; List.iteri (fun i v -> affiche_valeur v ; if i < List.length l - 1 then print_string "; ") l ; print_string "]"
   
 (* Recherche d'une variable dans l'environnement *)
 let rec cherche_var x env = match env with
@@ -142,6 +139,25 @@ let rec filtre motif valeur = match motif, valeur with
   | MUnit, VUnit -> Some []
   | MVar x, v -> Some [(x, v)]
   | MTuple ms, VTuple vs when List.length ms = List.length vs ->
+    let resultats = List.map2 filtre ms vs in
+    if List.mem None resultats then None
+    else Some (List.concat (List.map (function Some l -> l | _ -> []) resultats))
+  | MException m, VError j ->
+    (match m with
+    | MInt i when i=j -> Some []
+    | MVar x -> Some [(x, VI j)]
+    | _ -> None)
+  | MCons(m1, m2), VList (v::vs) -> 
+    let resultat = filtre m1 v in
+    (match resultat with
+    | None -> None
+    | Some l1 -> 
+      let resultat_liste = filtre m2 (VList vs) in
+      (match resultat_liste with
+      | None -> None
+      | Some l2 -> Some (l1 @ l2)))
+  | MNil, VList [] -> Some []
+  | MList ms, VList vs when List.length ms = List.length vs ->
     let resultats = List.map2 filtre ms vs in
     if List.mem None resultats then None
     else Some (List.concat (List.map (function Some l -> l | _ -> []) resultats))
@@ -244,6 +260,9 @@ let rec eval expr env = match expr with
   
   | Fun(m, e) ->
     VClosure(m, e, env)
+
+  | Function branches ->
+    VFunctionClosure(branches, env)
   
   | App(e1, e2) ->
     let v_arg = eval e2 env in
@@ -253,6 +272,15 @@ let rec eval expr env = match expr with
       (match filtre m v_arg with
       | Some bindings -> eval e (bindings @ env_closure)
       | None -> raise FiltrageSansCorrespondance)
+    | VFunctionClosure(branches, env_closure) ->
+      let rec essaie_branches = function
+      | [] -> raise FiltrageSansCorrespondance
+      | (motifs, e) :: reste ->
+        (match chercher_match motifs v_arg with
+        | None -> essaie_branches reste
+        | Some b -> eval e (b @ env_closure))
+      in
+      essaie_branches branches
     | _ -> raise ApplicationNonFonction)
   
   | LetRec(f, e1, e2) ->
@@ -296,19 +324,41 @@ let rec eval expr env = match expr with
     in 
     essaie_branches branches
 
-  | Raise s -> VError(s)
+  | Exception e ->
+    let v = eval e env in
+    (match v with
+    | VI k -> VException k
+    | _ -> raise (ErreurDeType "L'exception E requiert un entier"))
 
-  | Try_with (e1, e2, k) -> let res = eval e1 env in begin match res with
-    | VError(u) -> eval e2 ((k, VI(u))::env)
-    | _ -> res
-    end
+  | Raise e -> 
+    let v = eval e env in
+    (match v with
+    | VException k -> VError k
+    | _ -> raise (ErreurDeType "Raise requiert une exception"))
 
-  | Nil -> Vlist([])
+  | TryWith(e, branches) -> 
+    let v = eval e env in
+    (match v with
+    | VError _ -> 
+      let rec essaie_branches brch = match brch with
+      | [] -> raise FiltrageSansCorrespondance
+      | (motifs, e)::reste ->
+        (match chercher_match motifs v with
+        | None -> essaie_branches reste
+        | Some new_env -> eval e (new_env @ env))
+      in 
+      essaie_branches branches
+    | _ -> v)
 
-  | Cons(e, l) -> begin match eval l env with
-    | Vlist(ll) -> Vlist((eval e env)::ll)
-    | _-> raise (ErreurDeType"pas les bons types pour les listes")
-  end
+  | Nil -> VList []
+
+  | Cons(e, l) -> 
+    let v = eval l env in
+    (match v with
+    | VList ll -> VList ((eval e env)::ll)
+    | _-> raise (ErreurDeType "Pas une liste avec ::"))
+
+
 (* Version simplifiée de eval pour fouine.ml - sans environnement en paramètre *)
 let eval e = 
   let env = [] in
