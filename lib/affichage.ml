@@ -26,9 +26,13 @@ let rec affiche_motif m = match m with
   | MUnit -> print_string "()"
   | MTuple ms -> print_string "(" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string ")"
   | MException m -> print_string "E " ; affiche_motif m 
-  | MCons(m1, m2) -> affiche_motif m1 ; print_string "::" ; affiche_motif m2
   | MNil -> print_string "[]"
+  | MCons(m1, m2) -> affiche_motif m1 ; print_string "::" ; affiche_motif m2
   | MList ms -> print_string "[" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string "]"
+  | MConstructor(c, m_option) ->
+    (match m_option with
+    | None -> print_string c
+    | Some m -> print_string c ; print_string " " ; affiche_motif m)
 
 (* Fonction d'affichage *)
 let rec affiche_expr e =
@@ -76,8 +80,17 @@ let rec affiche_expr e =
     print_string "TryWith(" ; affiche_expr e ; print_string ", [" ;
     List.iteri (fun i (motifs, ei) -> List.iteri (fun j m -> affiche_motif m ; if j < List.length motifs - 1 then print_string " | ") motifs ; print_string "->" ; affiche_expr ei ; if i < List.length branches - 1 then print_string " | ") branches ;
     print_string "])"
-  | Cons(a, l) -> aff_aux "Cons(" [a;l]
   | Nil -> print_string "Nil"
+  | Cons(a, l) -> aff_aux "Cons(" [a;l]
+  | Type(t, branches, e) ->
+    print_string ("Type(" ^ t ^ ", [") ;
+    List.iteri (fun i (c, arite) -> print_string (c ^ " / ") ; print_int arite ; if i < List.length branches - 1 then print_string " | ") branches ;
+    print_string "], " ; affiche_expr e ; print_string ")"
+  | Constructor(c, e_option) ->
+    (match e_option with
+    | None -> print_string ("Constructor(" ^ c ^ ")")
+    | Some e -> print_string ("Constructor(" ^ c ^ ", ") ; affiche_expr e ; print_string ")")
+
 
 let rec affiche_val v =  match v with 
   | VI k -> print_int k
@@ -90,3 +103,9 @@ let rec affiche_val v =  match v with
   | VException k -> print_string "E " ; print_int k
   | VError k -> print_string "Exception: " ; print_int k
   | VList l -> print_string "[" ; List.iteri (fun i v -> affiche_val v ; if i < List.length l - 1 then print_string "; ") l ; print_string "]"
+  | VConstructor(c, None) -> print_string c
+  | VConstructor(c, Some v) ->
+    print_string c ; print_string " " ;
+    (match v with
+    | VConstructor _ -> print_string "(" ; affiche_valeur v ; print_string ")"
+    | _ -> affiche_valeur v)
