@@ -1,1 +1,0 @@
-let rec f y = (if true then fun x -> f x else fun x -> x) in f 10 15 18 20 21

@@ -44,7 +44,8 @@ case "$1" in
 5) Folders=( "T1-Coeur" "T2-LetIn" "T3-Fonctions" "T31-RecDef" "T4-References" "T5-Exceptions" );;
 6) Folders=( "T1-Coeur" "T2-LetIn" "T3-Fonctions" "T31-RecDef" "T4-References" "T5-Exceptions" "T6-Couples" );;
 7) Folders=( "T1-Coeur" "T2-LetIn" "T3-Fonctions" "T31-RecDef" "T4-References" "T5-Exceptions" "T6-Couples" "T7-Listes" );;
-*) echo "ERROR: Wrong first argument: $1 should be in [1 2 3 31 4 5 6 7]";exit 1;;
+8) Folders=( "T8-TestPerso" );;
+*) echo "ERROR: Wrong first argument: $1 should be in [1 2 3 31 4 5 6 7 8]";exit 1;;
 esac
 
 if [[ -x "$2" ]]

@@ -16,7 +16,7 @@ let recupere_entree () =
   let usage = "pour fouiner. Utilisation : ./fouine <fichier> [options]" in
 
   Arg.parse (* ci-dessous les 3 arguments de Arg.parse : *)
-    opt_list(* la liste des options, vide *)
+    opt_list (* la liste des options, vide *)
     (fun s -> nom_fichier := s) (* la fonction a déclencher lorsqu'on récupère un string qui n'est pas une option : ici c'est le nom du fichier, et on stocke cette information dans la référence nom_fichier *)
     usage; (* le message d'accueil, qui est vide *)
   try
@@ -28,22 +28,47 @@ let recupere_entree () =
     parse () 
   with 
   | Parsing.Parse_error -> 
-      Printf.eprintf "Erreur de syntaxe\n"; 
+      Printf.eprintf "Syntax Error\n"; 
       exit 1
   | e -> 
-      Printf.eprintf "Problème de saisie: %s\n" (Printexc.to_string e); 
+      Printf.eprintf "Input problem: %s\n" (Printexc.to_string e); 
       exit 1
 
 (* le traitement d'une expression en entrée *)   
 let execute e =
+  (* Option -showsrc : affiche seulement le code source *)
+  if !_SHOWSRC && not !_DEBUG then (
+    Affichage.affiche_src e;
+    print_newline();
+    print_newline()
+  )
+
+  (* Option -debug : affiche arbre syntaxique + exécute + affiche résultat *)
+  else if !_DEBUG then (
+    (* Affiche l'arbre syntaxique *)
+    print_string "====== Arbre syntaxique ======\n";
+    Affichage.affiche_expr e;
+    print_newline();
+    print_newline();
+    
+    (* Affiche le code source *)
+    print_string "====== Code source ======\n";
+    Affichage.affiche_src e;
+    print_newline();
+    print_newline();
+
+    
+    (* Évalue et affiche la valeur de fin *)
+    print_string "====== Exécution ======\n";
+    flush stdout
+  );
+
+
   begin
-    if (!_SHOWSRC || !_DEBUG) then (
-      Affichage.affiche_expr e; (* on affiche e *)
-      print_newline());
     try
       let v = Expressions.eval e in (* on évalue e *)
       if (!_DEBUG) then (
-        Affichage.affiche_val v;
+        print_string "Valeur finale: " ; Affichage.affiche_val v;
         print_newline());
     with
     | Expressions.DivisionParZero ->
@@ -60,6 +85,15 @@ let execute e =
         exit 1
     | Expressions.ApplicationNonFonction ->
         Printf.eprintf "Error: Attempt to apply to a value that is not a function\n";
+        exit 1
+    | Expressions.TasPlein ->
+        Printf.eprintf "Error: Heap full, no more memory available\n";
+        exit 1
+    | Expressions.AdresseInvalide addr ->
+        Printf.eprintf "Error: Invalid address %d\n" addr;
+        exit 1
+    | Expressions.FiltrageSansCorrespondance ->
+        Printf.eprintf "Error: Filtering failed (incomplete match ?)\n";
         exit 1
   end
 

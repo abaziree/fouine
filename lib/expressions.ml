@@ -251,6 +251,8 @@ let rec eval expr env = match expr with
     | (Eq, VB b1, VB b2) -> VB (b1 = b2)
     | (NEq, VI k1, VI k2) -> VB (k1 <> k2)
     | (NEq, VB b1, VB b2) -> VB (b1 <> b2)
+    | (Eq, VList l1, VList l2) -> VB (l1 = l2)
+    | (NEq, VList l1, VList l2) -> VB (l1 <> l2)
     | (Eq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 = c2)
     | (NEq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 <> c2)
     | (LessEq, VI k1, VI k2) -> VB (k1 <= k2)

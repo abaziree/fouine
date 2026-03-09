@@ -41,7 +41,7 @@ open Expressions
 %right PIPE
 %nonassoc PRIO_TUPLE
 %right ARROW
-%left CONS
+%right CONS
 %right SEMI RCROCHET
 %nonassoc ASSIGN
 %left CONSTRUCTOR
@@ -68,7 +68,6 @@ main:
 /* Gestion du niveau racine avec ;; */
 top_expression:
   | e=expression                                                                  { e }
-  (*| LET x=binding EQ e=expression SEMISEMI                                        { LetIn(x, e, Unit) }*)
   | LET m=motif EQ e1=expression SEMISEMI e2=top_expression                       { LetIn(m, e1, e2) }
   | LET REC x=binding EQ e1=expression SEMISEMI e2=top_expression                 { LetRec(x, e1, e2) }   
   | LET f=IDENT params=motif+ EQ e1=expression SEMISEMI e2=top_expression         { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) }
@@ -80,7 +79,7 @@ top_expression:
 expression:
   | e=expression_tuple { e }
   
-  /* Structures let..in , let rec .. et fun , := et match .. with*/
+  /* Structures let..in , let rec .. et fun , := et match .. with */
   | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } 
   | LET m=motif EQ e1=expression IN e2=expression                           { LetIn(m, e1, e2) }
   | LET REC x=binding EQ e1=expression IN e2=expression                     { LetRec(x, e1, e2) }  
@@ -125,6 +124,8 @@ expression_tuple_rest:
   | e=expression_tuple_last                             { [e] }
   | e=expression_op COMMA es=expression_tuple_rest      { e::es }
 
+/* Sert pour les constructions let .. in, match .. with, etc qui concluent un tuple tout en excluant 
+les :=, ; qui n'ont pas d'utilité dans ce cas et cela permet d'éviter les reduce/reduce conflict */
 expression_tuple_last:
   | e=expression_op { e }
   
@@ -168,7 +169,7 @@ expression_op:
   /*Opérations sur les listes*/
   | e1=expression_op CONS e2=expression_no_tuple        { Cons(e1, e2) }
 
-/* Niveau 2 : Application de fonction (associative à gauche) */
+/* Niveau 2 : Application de "fonctions" */
 application:
   | e=simple_expr                             { e } 
   | e1=application e2=simple_expr             { App(e1, e2) } 
@@ -237,14 +238,14 @@ branches_no_tuple:
   | m=motif_pipe ARROW e=expression_no_tuple    %prec PRIO_PIPE             { [(m, e)] }
   | m=motif_pipe ARROW e=expression_no_tuple PIPE rest=branches_no_tuple    { (m, e)::rest }
 
+/* Branches des type = ... | ... et on conserve l'arité de chaque constructeur (rq : on considère que C of int * int est d'arité 1 et prends pour argument un int * int) */
 branches_type:
   | c=CONSTRUCTOR                                                       { [(c, 0)] }
   | c=CONSTRUCTOR OF constructor_type                                   { [(c, 1)] }
   | c=CONSTRUCTOR PIPE rest=branches_type                               { (c, 0)::rest }
   | c=CONSTRUCTOR OF constructor_type PIPE rest=branches_type           { (c, 1)::rest }
 
-/* Les types des constructeurs */
-
+/* Les types des constructeurs (pour l'instant on ne les utilises pas) */
 constructor_type:
   | IDENT                               { () }
   | LPAREN constructor_type RPAREN      { () }
