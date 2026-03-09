@@ -27,6 +27,8 @@ open Expressions
 %token EXCEPTION
 %token TRY
 %token NIL CONS LCROCHET RCROCHET
+%token TYPE OF
+%token <string> CONSTRUCTOR
 
 
 /* Token de priorités */
@@ -42,6 +44,7 @@ open Expressions
 %left CONS
 %right SEMI RCROCHET
 %nonassoc ASSIGN
+%left CONSTRUCTOR
 %left OR
 %left AND
 %nonassoc NOT
@@ -49,6 +52,8 @@ open Expressions
 %left PLUS MINUS
 %nonassoc PRIO_NO_TUPLE_EXPR_OP
 %left TIMES DIVIDE MODULO
+%nonassoc INT BOOL IDENT NIL DEREF BEGIN LPAREN LCROCHET 
+%nonassoc UNDERSCORE EXCEPTION
 
 /* PARTIE 4 : Point d'entrée */
 %start main
@@ -68,6 +73,8 @@ top_expression:
   | LET REC x=binding EQ e1=expression SEMISEMI e2=top_expression                 { LetRec(x, e1, e2) }   
   | LET f=IDENT params=motif+ EQ e1=expression SEMISEMI e2=top_expression         { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) }
   | LET REC f=IDENT params=motif+ EQ e1=expression SEMISEMI e2=top_expression     { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
+  | TYPE t=IDENT EQ branches=branches_type SEMISEMI e=top_expression              { Type(t, branches, e) }
+  | TYPE t=IDENT EQ PIPE branches=branches_type SEMISEMI e=top_expression         { Type(t, branches, e) }
 
 /* Niveau 5 : Expressions générales (priorité basse) avec les tuples inclus */
 expression:
@@ -169,6 +176,7 @@ application:
   | REF e=simple_expr                         { Ref e }
   | EXCEPTION e=simple_expr                   { Exception e }
   | RAISE e=simple_expr                       { Raise e }
+  | c=CONSTRUCTOR e=simple_expr               { Constructor(c, Some e) } 
 
 /* Niveau 1 : Expressions simples (priorité maximale) */
 simple_expr:
@@ -179,7 +187,8 @@ simple_expr:
   | NIL                                         { Nil }
   | LCROCHET e1=expression SEMI e2=liste        { Cons(e1, e2) }
   | LCROCHET e=expression RCROCHET              { Cons(e, Nil) }
-  | DEREF e=simple_expr                         { Deref e }
+  | DEREF e=simple_expr                         { Deref e } 
+  | c=CONSTRUCTOR                               { Constructor(c, None) }
   | LPAREN e=expression RPAREN                  { e } 
   | BEGIN e=expression END                      { e } 
 
@@ -197,6 +206,7 @@ motif:
   | m=motif_simple                          { m }
   | m=motif_simple COMMA ms=motif_tuple     { MTuple(m::ms) }
   | m1=motif_simple CONS m2=motif           { MCons(m1, m2) }
+  | c=CONSTRUCTOR m=motif_simple            { MConstructor(c, Some m) }
 
 motif_tuple:
   | m=motif_simple                          { [m] }
@@ -215,6 +225,7 @@ motif_simple:
   | NIL                                     { MNil }
   | EXCEPTION m=motif_simple                { MException m }
   | LCROCHET m=motif_list RCROCHET          { MList m }
+  | c=CONSTRUCTOR                           { MConstructor(c, None) }
   | LPAREN m=motif RPAREN                   { m }
 
 /* Branches des match .. with et try .. with */
@@ -225,6 +236,19 @@ branches:
 branches_no_tuple:
   | m=motif_pipe ARROW e=expression_no_tuple    %prec PRIO_PIPE             { [(m, e)] }
   | m=motif_pipe ARROW e=expression_no_tuple PIPE rest=branches_no_tuple    { (m, e)::rest }
+
+branches_type:
+  | c=CONSTRUCTOR                                                       { [(c, 0)] }
+  | c=CONSTRUCTOR OF constructor_type                                   { [(c, 1)] }
+  | c=CONSTRUCTOR PIPE rest=branches_type                               { (c, 0)::rest }
+  | c=CONSTRUCTOR OF constructor_type PIPE rest=branches_type           { (c, 1)::rest }
+
+/* Les types des constructeurs */
+
+constructor_type:
+  | IDENT                               { () }
+  | LPAREN constructor_type RPAREN      { () }
+  | IDENT TIMES constructor_type        { () }
 
 /* Les listes */
 liste:
