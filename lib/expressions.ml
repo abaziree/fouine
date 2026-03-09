@@ -1,11 +1,12 @@
-(* Types pour les opérateurs arithmétiques et booléens binaires *)
+(* Types pour les opérateurs arithmétiques *)
 type arop =
   | Add
   | Mul 
   | Min
   | Div 
   | Mod
-
+ 
+(* Types pour les opérateurs booléens binaires*) 
 type blop =
   | Eq
   | NEq

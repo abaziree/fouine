@@ -1,7 +1,3 @@
-# Projet Fonctionnel, rendu 0
-
-Ce répertoire contient un programme de départ à partir duquel vous pouvez programmer votre fouine.
-
 ## Compilation et execution
 
 Les commandes ci-dessous sont à exécuter dans le répertoire principal, qui est au-dessus de bin/ et lib/.
@@ -16,9 +12,7 @@ pour executer le programme, lancer
 dune exec bin/fouine.exe
 ```
 
-entrez ensuite une expression arithmetique, avec juste `+ -` et `*`, comme par exemple `4+3*5`
-
-
+Entrez ensuite un programme OCaml
 
 On vous conseille d'exécuter une fois la commande
 ```
@@ -30,51 +24,22 @@ Après quoi vous pouvez
 - taper `./fouine` pour lancer l'exécutable et saisir une expression au clavier
 - taper `./fouine test/basic.ml` pour lancer fouine sur le fichier basic.ml
 
-## Ce qui est attendu
+## Ce que nous avons fait :
 
-Lisez les fichiers dans cette archive, compilez le code (cf. ci-dessous)
+Nous avons implémenté les expressions arithmétiques, les opérateurs booléns, la fonction prInt, les déclarations des LetIn, les fonctions (récursives ou pas), les exceptions (seulement l'exception E of int), les listes, les options, les tuples et les motifs. 
 
-Puis étendez fouine. Voici une succession d'étapes, traitez celles que vous pouvez, dans la mesure de vos possibilités.  
 
-1. expressions arithmétiques. 
-Contemplez l’évaluation des expressions arithmétiques, améliorez les choses du point de vue de la factorisation du code si vous voyez un moyen de le faire ; sinon, laissez en l’état pour le moment.
+## Les expressions arithmétiques et opérateurs booléens
 
-2. opérateurs booléens et `if.. then.. else`
-3. fonction `prInt` (cf. les notes de cours)
-4. ajout des déclarations let.. in
-5. ajout des fonctions
-6. fonctions récursives
-etc., ad lib
+On a utilisé une fonction pour alléger la fonction d'affichage qui associe à chaque opérateur lui-même comme chaîne de caractères. 
 
-Pour chaque étape, référez-vous aux notes de cours (partie 1.2). 
-Écrivez à chaque fois de petits fichiers de tests dans le répertoire `test/`
 
-## Travailler sur fouine, modifier le code
+## Les exceptions
 
-`bin/fouine.ml` : fichier principal
+Elles ont été implémentées comme valeur, puisque nous n'avons pas fait de continuation.
 
-`lib/expressions.ml` : définition des expressions et de l'évaluation
 
-`lib/affiche.ml` : affichage des expressions et des valeurs
+## Les listes
 
-`lib/lexer.mll` : lexèmes, analyse lexicale
+Pour implémenter les listes, il a été décidé de procéder de la manière suivante : soit on parse la liste vide (qui contient une expression, donc potentiellement une autre liste), soit un singleton, soit on va chercher une liste d'expressions séparées par des points-virgules, qui se conclut par ]. Ainsi, lorsqu'on entame une liste de plus de 2 éléments, on bascule dans le niveau "liste", qui nécessite un ] pour finir de parser. 
 
-`lib/parser.mly` : règles de grammaire, analyse syntaxique
-
-`tests/` : sous-répertoire de tests
-
-fichiers `dune` et `dune-project` : pour la compilation, à ne pas modifier a priori
-
-En principe vous n'avez à modifier que les fichiers
-  `expr.ml`    `lexer.mll`    `parser.mly`
-dans le répertoire `lib/`
-
-## Erreurs à la compilation en lien avec le lexer et le parser :
-   référez-vous au fichier **README-parser.md*, dans cette archive
-
-## Date limite pour téléverser ce rendu sur la page du portail des études :
-
-   **lundi 2 février 2025 à 23h59**
-
-     . indiquez brièvement au début du fichier Readme ce que vous avez pu ajouter à fouine
-     . envoyez une archive **qui compile**

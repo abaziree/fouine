@@ -1,5 +1,6 @@
 open Expressions
 
+(*Pour alléger l'affichage des opérations arithmétiques*)
 let string_of_arop arop = match arop with 
   | Add -> "Add"
   | Mul -> "Mul"
@@ -7,6 +8,7 @@ let string_of_arop arop = match arop with
   | Div -> "Div"
   | Mod -> "Mod"
 
+(* Pour alléger l'affichage des opéations booléennes binaires*)
 let string_of_blop blop = match blop with 
   | Eq -> "Eq"
   | NEq -> "NEq"
@@ -30,7 +32,7 @@ let rec affiche_motif m = match m with
   | MNil -> print_string "[]"
   | MList ms -> print_string "[" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string "]"
 
-(* Fonction d'affichage *)
+(* Fonction d'affichage des expressions*)
 let rec affiche_expr e =
   let aff_aux s l = 
     begin
@@ -79,6 +81,7 @@ let rec affiche_expr e =
   | Cons(a, l) -> aff_aux "Cons(" [a;l]
   | Nil -> print_string "Nil"
 
+ (*Fonction d' et booléens binairesaffichage des valeurs*) 
 let rec affiche_val v =  match v with 
   | VI k -> print_int k
   | VB b -> print_string (if b then "true" else "false")
@@ -90,3 +93,4 @@ let rec affiche_val v =  match v with
   | VException k -> print_string "E " ; print_int k
   | VError k -> print_string "Exception: " ; print_int k
   | VList l -> print_string "[" ; List.iteri (fun i v -> affiche_val v ; if i < List.length l - 1 then print_string "; ") l ; print_string "]"
+ et booléens binaires
