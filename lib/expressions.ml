@@ -29,6 +29,7 @@ type motif =
   | MCons of motif * motif
   | MNil
   | MList of  motif list
+  | MConstructor of string * motif option
 
 (* Type pour les expressions *)
 type expr =
@@ -54,8 +55,10 @@ type expr =
   | Exception of expr
   | Raise of expr
   | TryWith of expr * (motif list * expr) list
-  | Cons of expr * expr
   | Nil
+  | Cons of expr * expr
+  | Type of string * (string * int) list * expr
+  | Constructor of string * expr option
   
 
 (* Type pour les valeurs *)
@@ -70,6 +73,7 @@ type valeur =
   | VException of int
   | VError of int
   | VList of valeur list
+  | VConstructor of string * valeur option
 
 (* Type pour l'environnement (association variable -> valeur) *)
 and environnement = (string * valeur) list
@@ -79,6 +83,16 @@ and environnement = (string * valeur) list
 let tas_size = 1234
 let tas = Array.make tas_size VUnit
 let next_addr = ref 0
+
+(* Table globale des constructeurs *)
+
+let constructeurs : (string, int) Hashtbl.t = Hashtbl.create 100
+
+let declare_constructeurs branches =
+  List.iter (fun (c, arite) -> Hashtbl.replace constructeurs c arite) branches
+
+let est_constructeur c =
+  Hashtbl.mem constructeurs c
 
 (* Exceptions pour la gestion des erreurs *)
 exception DivisionParZero
@@ -102,6 +116,12 @@ let rec affiche_valeur v = match v with
   | VException k -> print_string "E " ; print_int k
   | VError k -> print_string "Exception: " ; print_int k
   | VList l -> print_string "[" ; List.iteri (fun i v -> affiche_valeur v ; if i < List.length l - 1 then print_string "; ") l ; print_string "]"
+  | VConstructor(c, None) -> print_string c
+  | VConstructor(c, Some v) ->
+    print_string c ; print_string " " ;
+    (match v with
+    | VConstructor _ -> print_string "(" ; affiche_valeur v ; print_string ")"
+    | _ -> affiche_valeur v)
   
 (* Recherche d'une variable dans l'environnement *)
 let rec cherche_var x env = match env with
@@ -162,6 +182,8 @@ let rec filtre motif valeur = match motif, valeur with
     let resultats = List.map2 filtre ms vs in
     if List.mem None resultats then None
     else Some (List.concat (List.map (function Some l -> l | _ -> []) resultats))
+  | MConstructor(c1, None), VConstructor(c2, None) when c1 = c2 -> Some []
+  | MConstructor(c1, Some m), VConstructor(c2, Some v) when c1 = c2 -> filtre m v
   | _ -> None
 
 let rec chercher_match motifs valeur = match motifs with
@@ -229,6 +251,8 @@ let rec eval expr env = match expr with
     | (Eq, VB b1, VB b2) -> VB (b1 = b2)
     | (NEq, VI k1, VI k2) -> VB (k1 <> k2)
     | (NEq, VB b1, VB b2) -> VB (b1 <> b2)
+    | (Eq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 = c2)
+    | (NEq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 <> c2)
     | (LessEq, VI k1, VI k2) -> VB (k1 <= k2)
     | (LessEq, VB b1, VB b2) -> VB (b1 <= b2)
     | (GreaterEq, VI k1, VI k2) -> VB (k1 >= k2)
@@ -358,6 +382,15 @@ let rec eval expr env = match expr with
     (match v with
     | VList ll -> VList ((eval e env)::ll)
     | _-> raise (ErreurDeType "Pas une liste avec ::"))
+  
+  | Type(_, branches, e) ->
+    declare_constructeurs branches ;
+    eval e env
+
+  | Constructor(c, e_option) ->
+    (match e_option with
+    | None -> VConstructor(c, None)
+    | Some e -> let v = eval e env in VConstructor(c, Some v))
 
 
 (* Version simplifiée de eval pour fouine.ml - sans environnement en paramètre *)
