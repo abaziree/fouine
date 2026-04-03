@@ -33,10 +33,11 @@ let rec affiche_val v =  match v with
   | VList l -> print_string "[" ; List.iteri (fun i v -> affiche_val v ; if i < List.length l - 1 then print_string "; ") l ; print_string "]"
   | VConstructor(c, None) -> print_string c
   | VConstructor(c, Some v) ->
-    print_string c ; print_string " " ;
+    print_string c ; print_string "(" ;
     (match v with
     | VConstructor _ -> print_string "(" ; affiche_valeur v ; print_string ")"
-    | _ -> affiche_valeur v)
+    | _ -> affiche_valeur v) ;
+    print_string ")"
 
 (* Affichage d'un motif *)
 let rec affiche_motif m = match m with
@@ -48,12 +49,12 @@ let rec affiche_motif m = match m with
   | MTuple ms -> print_string "(" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string ")"
   | MException m -> print_string "E " ; affiche_motif m 
   | MNil -> print_string "[]"
-  | MCons(m1, m2) -> affiche_motif m1 ; print_string "::" ; affiche_motif m2
+  | MCons(m1, m2) -> affiche_motif m1 ; print_string "::(" ; affiche_motif m2 ; print_string ")"
   | MList ms -> print_string "[" ; List.iteri (fun i m -> affiche_motif m ; if i < List.length ms - 1 then print_string ", ") ms ; print_string "]"
   | MConstructor(c, m_option) ->
     (match m_option with
     | None -> print_string c
-    | Some m -> print_string c ; print_string " " ; affiche_motif m)
+    | Some m -> print_string c ; print_string "(" ; affiche_motif m ; print_string ")")
 
 (* ---------------------------------------- AFFICHAGE -DEBUG ---------------------------------------- *)
 

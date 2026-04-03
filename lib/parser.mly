@@ -205,17 +205,27 @@ expression_op:
   | NOT e=expression_op                                 { Not e } 
 
   /*Opérations sur les listes*/
-  | e1=expression_op CONS e2=expression_op        { Cons(e1, e2) }
+  | e1=expression_op CONS e2=expression_op              { Cons(e1, e2) }
 
-/* Niveau 2 : Application de "fonctions" */
+/* Niveau 2c : Application de "fonctions" */
 application:
-  | e=simple_expr                             { e }
-  | e1=application e2=simple_expr             { App(e1, e2) } 
+  | e=simple_constructor_expr                 { e }
+  | e1=application e2=simple_expr             { App(e1, e2) }
   | PRINT e=simple_expr                       { PrInt e }
   | REF e=simple_expr                         { Ref e }
   | EXCEPTION e=simple_expr                   { Exception e }
   | RAISE e=simple_expr                       { Raise e }
-  | c=CONSTRUCTOR e=simple_expr               { Constructor(c, Some e) } 
+
+/* Niveau 2b : Séparation simple_expr et constructor_expr */
+simple_constructor_expr:
+  | e=simple_expr                             { e }
+  | e=constructor_expr                        { e }
+
+/* Niveau 2a : Les constructeurs algébriques (pour éviter que les types récursifs soient vus comme 
+des applications entre 2 constructeurs */
+constructor_expr:
+  | c=CONSTRUCTOR                             { Constructor(c, None) }
+  | c=CONSTRUCTOR e=simple_constructor_expr   { Constructor(c, Some e) }
 
 /* Niveau 1 : Expressions simples (priorité maximale) */
 simple_expr:
@@ -227,7 +237,6 @@ simple_expr:
   | LCROCHET e1=expression SEMI e2=liste        { Cons(e1, e2) }
   | LCROCHET e=expression RCROCHET              { Cons(e, Nil) }
   | DEREF e=simple_expr                         { Deref e } 
-  | c=CONSTRUCTOR                               { Constructor(c, None) }
   | LPAREN e=expression RPAREN                  { e } 
   | BEGIN e=expression END                      { e } 
 
@@ -242,14 +251,17 @@ motif_pipe:
   | m=motif PIPE ms=motif_pipe              { m::ms }
 
 motif:
+  | m=motif_cons                            { m }
+  | m=motif_cons COMMA ms=motif_tuple       { MTuple(m::ms) }
+
+motif_cons:
   | m=motif_simple                          { m }
-  | m=motif_simple COMMA ms=motif_tuple     { MTuple(m::ms) }
-  | m1=motif_simple CONS m2=motif           { MCons(m1, m2) }
+  | m1=motif_cons CONS m2=motif_cons        { MCons(m1,m2) }
   | c=CONSTRUCTOR m=motif_simple            { MConstructor(c, Some m) }
 
 motif_tuple:
-  | m=motif_simple                          { [m] }
-  | m=motif_simple COMMA ms=motif_tuple     { m::ms }
+  | m=motif_cons                            { [m] }
+  | m=motif_cons COMMA ms=motif_tuple       { m::ms }
 
 motif_list:
   | m=motif                                 { [m] }
