@@ -1,1 +1,1 @@
-let x = [(let y = 9; 12); 17; 22)] in x
+let x = [(let y = 9 in 12); 17; 22] in x

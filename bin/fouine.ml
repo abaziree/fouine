@@ -38,8 +38,8 @@ let recupere_entree () =
 let execute e =
   (* Option -showsrc : affiche seulement le code source *)
   if !_SHOWSRC && not !_DEBUG then (
+    print_string "====== Code source ======\n";
     Affichage.affiche_src e;
-    print_newline();
     print_newline()
   )
 
@@ -66,10 +66,12 @@ let execute e =
 
   begin
     try
-      let v = Expressions.eval e in (* on évalue e *)
-      if (!_DEBUG) then (
-        print_string "Valeur finale: " ; Affichage.affiche_val v;
-        print_newline());
+      if not !_SHOWSRC || !_DEBUG then (
+        let v = Expressions.eval e in (* on évalue e *)
+        if (!_DEBUG) then (
+          print_string "Valeur finale: " ; Affichage.affiche_val v;
+          print_newline());
+      )
     with
     | Expressions.DivisionParZero ->
         Printf.eprintf "Error: Division by zero\n";

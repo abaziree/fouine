@@ -104,6 +104,9 @@ exception TasPlein
 exception AdresseInvalide of int
 exception FiltrageSansCorrespondance
 
+(* Exception pratique pour l'évaluation avec les raise *)
+exception Stop of valeur
+
 (* Fonction pour afficher une valeur *)
 let rec affiche_valeur v = match v with 
   | VI k -> print_int k
@@ -198,19 +201,23 @@ let rec eval expr env = match expr with
   | Cst k -> VI k
   
   | ArOp(arop, e1, e2) ->
-    let v1 = eval e1 env in
     let v2 = eval e2 env in
-    (match (arop, v1, v2) with
-    | (Add, VI k1, VI k2) -> VI (k1 + k2)
-    | (Mul, VI k1, VI k2) -> VI (k1 * k2)
-    | (Min, VI k1, VI k2) -> VI (k1 - k2)
-    | (Div, VI k1, VI k2) -> 
-        if k2 = 0 then raise DivisionParZero
-        else VI (k1 / k2)
-    | (Mod, VI k1, VI k2) -> 
-        if k2 = 0 then raise DivisionParZero
-        else VI (k1 mod k2)
-    | _ -> raise (ErreurDeType "Les opérations arithmétiques requièrent des entiers"))
+    (match v2 with
+    | VError k -> VError k
+    | _ -> 
+      let v1 = eval e1 env in
+      (match (arop, v1, v2) with
+      | (Add, VI k1, VI k2) -> VI (k1 + k2)
+      | (Mul, VI k1, VI k2) -> VI (k1 * k2)
+      | (Min, VI k1, VI k2) -> VI (k1 - k2)
+      | (Div, VI k1, VI k2) -> 
+          if k2 = 0 then raise DivisionParZero
+          else VI (k1 / k2)
+      | (Mod, VI k1, VI k2) -> 
+          if k2 = 0 then raise DivisionParZero
+          else VI (k1 mod k2)
+      | (_, VError k, _) -> VError k
+      | _ -> raise (ErreurDeType "Les opérations arithmétiques requièrent des entiers")))
   
   | Bool b -> VB b
   
@@ -229,7 +236,9 @@ let rec eval expr env = match expr with
         let v2 = eval e2 env in 
         (match v2 with 
         | VB b -> VB b
+        | VError k -> VError k
         | _ -> raise (ErreurDeType "L'opérateur || requiert des booléens"))
+    | VError k -> VError k
     | _ -> raise (ErreurDeType "L'opérateur || requiert des booléens"))
   
   | BlOp(And, e1, e2) ->
@@ -240,50 +249,61 @@ let rec eval expr env = match expr with
         let v2 = eval e2 env in 
         (match v2 with 
         | VB b -> VB b
+        | VError k -> VError k
         | _ -> raise (ErreurDeType "L'opérateur && requiert des booléens"))
+    | VError k -> VError k
     | _ -> raise (ErreurDeType "L'opérateur && requiert des booléens"))
   
   | BlOp(blop, e1, e2) ->
-    let v1 = eval e1 env in 
-    let v2 = eval e2 env in 
-    (match (blop, v1, v2) with
-    | (Eq, VI k1, VI k2) -> VB (k1 = k2)
-    | (Eq, VB b1, VB b2) -> VB (b1 = b2)
-    | (NEq, VI k1, VI k2) -> VB (k1 <> k2)
-    | (NEq, VB b1, VB b2) -> VB (b1 <> b2)
-    | (Eq, VList l1, VList l2) -> VB (l1 = l2)
-    | (NEq, VList l1, VList l2) -> VB (l1 <> l2)
-    | (Eq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 = c2)
-    | (NEq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 <> c2)
-    | (LessEq, VI k1, VI k2) -> VB (k1 <= k2)
-    | (LessEq, VB b1, VB b2) -> VB (b1 <= b2)
-    | (GreaterEq, VI k1, VI k2) -> VB (k1 >= k2)
-    | (GreaterEq, VB b1, VB b2) -> VB (b1 >= b2)
-    | (Less, VI k1, VI k2) -> VB (k1 < k2)
-    | (Less, VB b1, VB b2) -> VB (b1 < b2)
-    | (Greater, VI k1, VI k2) -> VB (k1 > k2)
-    | (Greater, VB b1, VB b2) -> VB (b1 > b2)
-    | _ -> raise (ErreurDeType "Comparaison entre types incompatibles"))
+    let v2 = eval e2 env in
+    (match v2 with
+    | VError k -> VError k
+    | _ -> 
+      let v1 = eval e1 env in  
+      (match (blop, v1, v2) with
+      | (Eq, VI k1, VI k2) -> VB (k1 = k2)
+      | (Eq, VB b1, VB b2) -> VB (b1 = b2)
+      | (NEq, VI k1, VI k2) -> VB (k1 <> k2)
+      | (NEq, VB b1, VB b2) -> VB (b1 <> b2)
+      | (Eq, VList l1, VList l2) -> VB (l1 = l2)
+      | (NEq, VList l1, VList l2) -> VB (l1 <> l2)
+      | (Eq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 = c2)
+      | (NEq, VConstructor(c1, None), VConstructor(c2, None)) -> VB (c1 <> c2)
+      | (LessEq, VI k1, VI k2) -> VB (k1 <= k2)
+      | (LessEq, VB b1, VB b2) -> VB (b1 <= b2)
+      | (GreaterEq, VI k1, VI k2) -> VB (k1 >= k2)
+      | (GreaterEq, VB b1, VB b2) -> VB (b1 >= b2)
+      | (Less, VI k1, VI k2) -> VB (k1 < k2)
+      | (Less, VB b1, VB b2) -> VB (b1 < b2)
+      | (Greater, VI k1, VI k2) -> VB (k1 > k2)
+      | (Greater, VB b1, VB b2) -> VB (b1 > b2)
+      | (_, VError k, _) -> VError k
+      | _ -> raise (ErreurDeType "Comparaison entre types incompatibles")))
   
   | Not e ->
     let v = eval e env in
     (match v with
     | VB b -> VB (not b)
+    | VError k -> VError k
     | _ -> raise (ErreurDeType "L'opérateur not requiert un booléen"))
   
   | PrInt e ->
     let v = eval e env in 
     (match v with
     | VI k -> print_int k ; print_newline () ; VI k
+    | VError k -> VError k
     | _ -> raise (ErreurDeType "prInt requiert un entier"))
   
   | Ident x -> cherche_var x env
   
   | LetIn(m, e1, e2) -> 
     let v1 = eval e1 env in
-    (match filtre m v1 with
-    | Some bindings -> eval e2 (bindings @ env)
-    | None -> raise FiltrageSansCorrespondance)
+    (match v1 with
+    | VError k -> VError k
+    | _ -> 
+      (match filtre m v1 with
+      | Some bindings -> eval e2 (bindings @ env)
+      | None -> raise FiltrageSansCorrespondance))
   
   | Fun(m, e) ->
     VClosure(m, e, env)
@@ -293,22 +313,26 @@ let rec eval expr env = match expr with
   
   | App(e1, e2) ->
     let v_arg = eval e2 env in
-    let v_fun = eval e1 env in
-    (match v_fun with
-    | VClosure(m, e, env_closure) ->
-      (match filtre m v_arg with
-      | Some bindings -> eval e (bindings @ env_closure)
-      | None -> raise FiltrageSansCorrespondance)
-    | VFunctionClosure(branches, env_closure) ->
-      let rec essaie_branches = function
-      | [] -> raise FiltrageSansCorrespondance
-      | (motifs, e) :: reste ->
-        (match chercher_match motifs v_arg with
-        | None -> essaie_branches reste
-        | Some b -> eval e (b @ env_closure))
-      in
-      essaie_branches branches
-    | _ -> raise ApplicationNonFonction)
+    (match v_arg with
+    | VError k -> VError k
+    | _ -> 
+      let v_fun = eval e1 env in
+      (match v_fun with
+      | VClosure(m, e, env_closure) ->
+        (match filtre m v_arg with
+        | Some bindings -> eval e (bindings @ env_closure)
+        | None -> raise FiltrageSansCorrespondance)
+      | VFunctionClosure(branches, env_closure) ->
+        let rec essaie_branches = function
+        | [] -> raise FiltrageSansCorrespondance
+        | (motifs, e) :: reste ->
+          (match chercher_match motifs v_arg with
+          | None -> essaie_branches reste
+          | Some b -> eval e (b @ env_closure))
+        in
+        essaie_branches branches
+      | VError k -> VError k
+      | _ -> raise ApplicationNonFonction))
   
   | LetRec(f, e1, e2) ->
     (match e1 with
@@ -321,46 +345,63 @@ let rec eval expr env = match expr with
 
   | Ref e ->
     let v = eval e env in
-    let addr = allouer v in
-    VAddr addr
+    (match v with
+    | VError k -> VError k
+    | _ -> 
+      let addr = allouer v in
+      VAddr addr)
 
   | Assign(e1, e2) ->
-    let v1, v2 = eval e1 env, eval e2 env in
-    (match v1 with 
-    | VAddr addr -> ecrire_tas addr v2 ; VUnit
-    | _ -> raise (ErreurDeType "L'affectation requiert une référence"))
+    let v2 = eval e2 env in
+    (match v2 with
+    | VError k -> VError k
+    | _ -> 
+      let v1 = eval e1 env in
+      (match v1 with 
+      | VAddr addr -> ecrire_tas addr v2 ; VUnit
+      | VError k -> VError k
+      | _ -> raise (ErreurDeType "L'affectation requiert une référence")))
 
   | Deref e ->
     let v = eval e env in
     (match v with
     | VAddr addr -> lire_tas addr
+    | VError k -> VError k
     | _ -> raise (ErreurDeType "Le déréférencement requiert une référence"))
 
   | Tuple es ->
-    let vs = List.map (fun e -> eval e env) es in
-    VTuple vs
+    (try
+      let vs = List.map (fun e -> let v = eval e env in match v with | VError k -> raise (Stop (VError k)) | _ -> v) (List.rev es) in
+      VTuple (List.rev vs)
+    with
+    | Stop v -> v)
 
   | MatchWith(e, branches) ->
     let v = eval e env in
-    let rec essaie_branches brch = match brch with
-    | [] -> raise FiltrageSansCorrespondance
-    | (motifs, e)::reste ->
-      (match chercher_match motifs v with
-      | None -> essaie_branches reste
-      | Some new_env -> eval e (new_env @ env))
-    in 
-    essaie_branches branches
+    (match v with
+    | VError k -> VError k
+    | _ -> 
+      let rec essaie_branches brch = match brch with
+      | [] -> raise FiltrageSansCorrespondance
+      | (motifs, e)::reste ->
+        (match chercher_match motifs v with
+        | None -> essaie_branches reste
+        | Some new_env -> eval e (new_env @ env))
+      in 
+      essaie_branches branches)
 
   | Exception e ->
     let v = eval e env in
     (match v with
     | VI k -> VException k
+    | VError k -> VError k
     | _ -> raise (ErreurDeType "L'exception E requiert un entier"))
 
   | Raise e -> 
     let v = eval e env in
     (match v with
     | VException k -> VError k
+    | VError k -> VError k
     | _ -> raise (ErreurDeType "Raise requiert une exception"))
 
   | TryWith(e, branches) -> 
@@ -380,9 +421,14 @@ let rec eval expr env = match expr with
   | Nil -> VList []
 
   | Cons(e, l) -> 
-    let v = eval l env in
-    (match v with
-    | VList ll -> VList ((eval e env)::ll)
+    let vl = eval l env in
+    (match vl with
+    | VList ll -> 
+      let ve = eval e env in
+      (match ve with
+      | VError k -> VError k
+      | _ -> VList (ve::ll))
+    | VError k -> VError k
     | _-> raise (ErreurDeType "Pas une liste avec ::"))
   
   | Type(_, branches, e) ->
@@ -392,7 +438,11 @@ let rec eval expr env = match expr with
   | Constructor(c, e_option) ->
     (match e_option with
     | None -> VConstructor(c, None)
-    | Some e -> let v = eval e env in VConstructor(c, Some v))
+    | Some e -> 
+      let v = eval e env in
+      (match v with
+      | VError k -> VError k
+      | _ -> VConstructor(c, Some v)))
 
 
 (* Version simplifiée de eval pour fouine.ml - sans environnement en paramètre *)

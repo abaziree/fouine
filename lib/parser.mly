@@ -37,7 +37,7 @@ open Expressions
 %token PRIO_NO_TUPLE_EXPR_OP
 
 /* PARTIE 3 : Associativités et priorités */
-%nonassoc IN ELSE PRIO_PIPE
+%nonassoc IN PRIO_PIPE
 %right PIPE
 %nonassoc PRIO_TUPLE
 %right ARROW
@@ -75,12 +75,12 @@ top_expression:
   | TYPE t=IDENT EQ branches=branches_type SEMISEMI e=top_expression              { Type(t, branches, e) }
   | TYPE t=IDENT EQ PIPE branches=branches_type SEMISEMI e=top_expression         { Type(t, branches, e) }
 
-/* Niveau 5 : Expressions générales (priorité basse) avec les tuples inclus */
+/* Niveau 5b : Expressions générales (priorité basse) avec les tuples inclus */
 expression:
   | e=expression_tuple { e }
   
   /* Structures let..in , let rec .. et fun , := et match .. with */
-  | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } 
+  | IF e1=expression THEN e2=expression_no_seq ELSE e3=expression_no_seq    { IfThenElse(e1, e2, e3) } 
   | LET m=motif EQ e1=expression IN e2=expression                           { LetIn(m, e1, e2) }
   | LET REC x=binding EQ e1=expression IN e2=expression                     { LetRec(x, e1, e2) }  
   | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression             { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
@@ -95,25 +95,63 @@ expression:
   | TRY e=expression WITH branches=branches                                 { TryWith(e, branches) }
   | TRY e=expression WITH PIPE branches=branches                            { TryWith(e, branches) }
 
-/* Niveau 4b : Expressions générales (priorité basse) mais sans tuples */
+/* Niveau 5a : Expressions générales mais sans ... ; ... */
+expression_no_seq:
+  | e=expression_tuple { e }
+  
+  /* Structures let..in , let rec .. et fun , := et match .. with */
+  | IF e1=expression THEN e2=expression_no_seq ELSE e3=expression_no_seq    { IfThenElse(e1, e2, e3) } 
+  | LET m=motif EQ e1=expression IN e2=expression                           { LetIn(m, e1, e2) }
+  | LET REC x=binding EQ e1=expression IN e2=expression                     { LetRec(x, e1, e2) }  
+  | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression             { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
+  | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression         { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
+  | FUN params=motif+ ARROW e=expression                                    { List.fold_right (fun param body -> Fun(param, body)) params e }
+  | FUNCTION branches=branches                                              { Function branches }
+  | FUNCTION PIPE branches=branches                                         { Function branches }
+  | e1=application ASSIGN e2=expression                                     { Assign(e1, e2) }
+  | MATCH e=expression WITH branches=branches                               { MatchWith(e, branches) }
+  | MATCH e=expression WITH PIPE branches=branches                          { MatchWith(e, branches) }
+  | TRY e=expression WITH branches=branches                                 { TryWith(e, branches) }
+  | TRY e=expression WITH PIPE branches=branches                            { TryWith(e, branches) }
+
+/* Niveau 4c : Expressions générales (priorité basse) mais sans tuples */
 expression_no_tuple:
   | e=expression_op { e } %prec PRIO_NO_TUPLE_EXPR_OP
   
   /* Structures let..in , let rec .. et fun , := et match .. with */
-  | IF e1=expression THEN e2=expression_no_tuple ELSE e3=expression_no_tuple          { IfThenElse(e1, e2, e3) } 
-  | LET m=motif EQ e1=expression IN e2=expression_no_tuple                            { LetIn(m, e1, e2) }
-  | LET REC x=binding EQ e1=expression IN e2=expression_no_tuple                      { LetRec(x, e1, e2) }  
-  | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple              { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
-  | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple          { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
-  | FUN params=motif+ ARROW e=expression_no_tuple                                     { List.fold_right (fun param body -> Fun(param, body)) params e } 
-  | FUNCTION branches=branches_no_tuple                                               { Function branches }
-  | FUNCTION PIPE branches=branches_no_tuple                                          { Function branches }
-  | e1=expression_no_tuple SEMI e2=expression_no_tuple                                { LetIn(MWild, e1, e2) }
-  | e1=application ASSIGN e2=expression_no_tuple                                      { Assign(e1, e2) }
-  | MATCH e=expression WITH branches=branches_no_tuple                                { MatchWith(e, branches) }
-  | MATCH e=expression WITH PIPE branches=branches_no_tuple                           { MatchWith(e, branches) }
-  | TRY e=expression WITH branches=branches_no_tuple                                  { TryWith(e, branches) }
-  | TRY e=expression WITH PIPE branches=branches_no_tuple                             { TryWith(e, branches) }
+  | IF e1=expression THEN e2=expression_no_tuple_no_seq ELSE e3=expression_no_tuple_no_seq          { IfThenElse(e1, e2, e3) } 
+  | LET m=motif EQ e1=expression IN e2=expression_no_tuple                                          { LetIn(m, e1, e2) }
+  | LET REC x=binding EQ e1=expression IN e2=expression_no_tuple                                    { LetRec(x, e1, e2) }  
+  | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple                            { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
+  | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple                        { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
+  | FUN params=motif+ ARROW e=expression_no_tuple                                                   { List.fold_right (fun param body -> Fun(param, body)) params e } 
+  | FUNCTION branches=branches_no_tuple                                                             { Function branches }
+  | FUNCTION PIPE branches=branches_no_tuple                                                        { Function branches }
+  | e1=expression_no_tuple SEMI e2=expression_no_tuple                                              { LetIn(MWild, e1, e2) }
+  | e1=application ASSIGN e2=expression_no_tuple                                                    { Assign(e1, e2) }
+  | MATCH e=expression WITH branches=branches_no_tuple                                              { MatchWith(e, branches) }
+  | MATCH e=expression WITH PIPE branches=branches_no_tuple                                         { MatchWith(e, branches) }
+  | TRY e=expression WITH branches=branches_no_tuple                                                { TryWith(e, branches) }
+  | TRY e=expression WITH PIPE branches=branches_no_tuple                                           { TryWith(e, branches) }
+
+/* Niveau 4b : Expressions générales (priorité basse) mais sans tuples et sans ... ; ... */
+expression_no_tuple_no_seq:
+  | e=expression_op { e } %prec PRIO_NO_TUPLE_EXPR_OP
+  
+  /* Structures let..in , let rec .. et fun , := et match .. with */
+  | IF e1=expression THEN e2=expression_no_tuple_no_seq ELSE e3=expression_no_tuple_no_seq          { IfThenElse(e1, e2, e3) } 
+  | LET m=motif EQ e1=expression IN e2=expression_no_tuple                                          { LetIn(m, e1, e2) }
+  | LET REC x=binding EQ e1=expression IN e2=expression_no_tuple                                    { LetRec(x, e1, e2) }  
+  | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple                            { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } 
+  | LET REC f=IDENT params=motif+ EQ e1=expression IN e2=expression_no_tuple                        { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetRec(f, fun_expr, e2) }
+  | FUN params=motif+ ARROW e=expression_no_tuple                                                   { List.fold_right (fun param body -> Fun(param, body)) params e } 
+  | FUNCTION branches=branches_no_tuple                                                             { Function branches }
+  | FUNCTION PIPE branches=branches_no_tuple                                                        { Function branches }
+  | e1=application ASSIGN e2=expression_no_tuple                                                    { Assign(e1, e2) }
+  | MATCH e=expression WITH branches=branches_no_tuple                                              { MatchWith(e, branches) }
+  | MATCH e=expression WITH PIPE branches=branches_no_tuple                                         { MatchWith(e, branches) }
+  | TRY e=expression WITH branches=branches_no_tuple                                                { TryWith(e, branches) }
+  | TRY e=expression WITH PIPE branches=branches_no_tuple                                           { TryWith(e, branches) }
 
 /* Niveau 4a : Tuples */
 expression_tuple:
@@ -130,7 +168,7 @@ expression_tuple_last:
   | e=expression_op { e }
   
   /* Structures let..in , let rec .. et fun , := et match .. with*/
-  | IF e1=expression THEN e2=expression ELSE e3=expression                  { IfThenElse(e1, e2, e3) } %prec PRIO_TUPLE
+  | IF e1=expression THEN e2=expression_no_seq ELSE e3=expression_no_seq    { IfThenElse(e1, e2, e3) } 
   | LET m=motif EQ e1=expression IN e2=expression                           { LetIn(m, e1, e2) } %prec PRIO_TUPLE
   | LET REC x=binding EQ e1=expression IN e2=expression                     { LetRec(x, e1, e2) } %prec PRIO_TUPLE
   | LET f=IDENT params=motif+ EQ e1=expression IN e2=expression             { let fun_expr = List.fold_right (fun param body -> Fun(param, body)) params e1 in LetIn(MVar f, fun_expr, e2) } %prec PRIO_TUPLE
@@ -171,7 +209,7 @@ expression_op:
 
 /* Niveau 2 : Application de "fonctions" */
 application:
-  | e=simple_expr                             { e } 
+  | e=simple_expr                             { e }
   | e1=application e2=simple_expr             { App(e1, e2) } 
   | PRINT e=simple_expr                       { PrInt e }
   | REF e=simple_expr                         { Ref e }
