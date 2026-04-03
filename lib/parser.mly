@@ -205,7 +205,7 @@ expression_op:
   | NOT e=expression_op                                 { Not e } 
 
   /*Opérations sur les listes*/
-  | e1=expression_op CONS e2=expression_no_tuple        { Cons(e1, e2) }
+  | e1=expression_op CONS e2=expression_op        { Cons(e1, e2) }
 
 /* Niveau 2 : Application de "fonctions" */
 application:
